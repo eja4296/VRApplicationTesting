@@ -1,0 +1,16 @@
+{
+  "name": "gexf-js-master",
+  "version": "1.0.0",
+  "description": "Testing with gefx loading",
+  "main": "./src/server.js",
+  "dependencies": {
+    "request": "^2.78.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node ./src/server.js"
+  },
+  "author": "Erik Azzarano",
+  "license": "ISC"
+}
