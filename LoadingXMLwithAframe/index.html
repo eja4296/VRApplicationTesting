@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8"/>
+    <title>VR Graph/Network Data Visualization Application Prototype</title>
+    <style>
+        #sigma-container{
+            height: 750px;
+            border: 1px solid black;
+        }
+    </style>
+    <!-- import aFrame Library -->
+    <script src="https://aframe.io/releases/0.5.0/aframe.min.js"></script>
+    
+    <!-- Main Script -->
+    <script>
+        // Load init when page has loaded
+        window.onload = init;
+        
+        // Starter function
+        function init(){
+            loadData();
+        }
+        
+        // Load data from file
+        function loadData(){
+            var xhr = new XMLHttpRequest();
+            
+            // Store Nodes and Edges
+            var allNodes = [];
+            var allEdges = [];
+            // may need an additional array to store node positions to uue for edge position calculation
+            
+            // get scene element
+            var aScene = document.querySelector("#scene");
+            
+            // Once XML Request has loaded
+            xhr.onload = function(){
+                // Store xml response in variable
+                var xml = xhr.responseXML;
+                
+                // get nodes and edges from xml
+                allNodes = xml.querySelectorAll('node');
+                allEdges = xml.querySelectorAll('edge');
+                
+                // Loop through all nodes
+                // Get all node attributes
+                // Create sphere for node's position and size
+                // Create text for label
+                for(var i = 0; i < allNodes.length; i++){
+                    // get the current node
+                    var node = allNodes[i];
+                    // get the current node's id
+                    var nodeID = node.getAttribute('id');
+                    // get the current node's label
+                    var nodeLabel = node.getAttribute('label');
+                    
+                    // get the current node's x position
+                    var nodePositionX = node.querySelector('position').getAttribute('x');
+                    if(!nodePositionX){
+                        nodePositionX = nodeID;
+                    }
+                    // get the current node's y position
+                    var nodePositionY = node.querySelector('position').getAttribute('y');
+                     if(!nodePositionY){
+                        nodePositionY = nodeID;
+                    }
+                    
+                    // get the current node's size
+                    var nodeSize = node.querySelector('size').getAttribute('value');
+                    if(!nodeSize){
+                        nodeSize = 0.1;
+                    }
+                    
+                    // get the current node's r color value
+                    var nodeColorR = node.querySelector('color').getAttribute('r');
+                     if(!nodeColorR){
+                         nodeColorR = 0;
+                     }
+                     // get the current node's g color value
+                    var nodeColorG = node.querySelector('color').getAttribute('g');
+                     if(!nodeColorG){
+                         nodeColorG = 0;
+                     }
+                     // get the current node's b color value
+                    var nodeColorB = node.querySelector('color').getAttribute('b');
+                     if(!nodeColorB){
+                         nodeColorB = 0;
+                     }
+                    
+                    // Create the sphere for the node
+                    var nodeSphere = document.createElement('a-sphere');
+                    nodeSphere.setAttribute('position', '' + nodePositionX / 100 + ' ' + nodePositionY / 100 + ' -15');
+                    nodeSphere.setAttribute('radius', nodeSize / 100);
+                    nodeSphere.setAttribute('color', 'rgb(' + nodeColorR + ',' + nodeColorG + ',' + nodeColorB +')');
+                    aScene.appendChild(nodeSphere);
+                    
+                    // create the text for the node
+                    var nodeText = document.createElement('a-text');
+                    nodeText.setAttribute('value', nodeLabel);
+                    nodeText.setAttribute('position', '' + (nodePositionX / 100) - ((nodeSize / 100) /2) + ' ' + nodePositionY / 100 + ' -14.2');
+                    nodeText.setAttribute('color', "#000000");
+                    nodeText.setAttribute('opacity', "0.5");
+                    aScene.appendChild(nodeText);
+                    
+                }
+                
+                // Loop through all edges
+                // Get all edge attributes
+                
+                // Eventually need a way to display the edge...may be tricky
+                
+                for(var i = 0; i < allEdges.length; i++){
+                    // get current edge
+                    var edge = allEdges[i];
+                    // get current edge's id
+                    var edgeID = edge.getAttribute('id');
+                    // get current edge's source
+                    var edgeSource = edge.getAttribute('source');
+                    // get current edge's target
+                    var edgeTarget = edge.getAttribute('target');
+                    
+                }
+                
+            }
+            
+            // store the path to the data file
+            var path = "data/miserables.xml";
+            
+            // open the xml request
+            xhr.open('GET', path, true);
+            // set request header
+            xhr.setRequestHeader("If-Modified-Since", "Sat, 1 Jan 2010 00:00:00 GMT");
+            // send the request
+            xhr.send();
+            
+        }
+    
+    </script>
+    
+</head>
+
+<body>
+    
+    <a-scene id="scene">
+      <a-camera>
+        <a-cursor></a-cursor>
+      </a-camera>
+      <a-sky color="#ECECEC"></a-sky>
+    </a-scene>
+    
+</body>
+
+</html>

@@ -6,14 +6,75 @@
     <title>VR Graph/Network Data Visualization Application Prototype</title>
     <style>
         #sigma-container{
-            height: 500px;
+            height: 750px;
             border: 1px solid black;
         }
     </style>
+    
+    <script>
+    
+        window.onload = init;
+        
+        function init(){
+            loadData();
+            console.log("loading");
+        }
+        
+        function loadData(){
+            var xhr = new XMLHttpRequest();
+            
+            var allNodes = [];
+            var allEdges = [];
+            
+            
+            xhr.onload = function(){
+                
+                var html = "";
+                var graphData = document.querySelector("#graphData");
+                var xml = xhr.responseXML;
+                
+                allNodes = xml.querySelectorAll('node');
+                allEdges = xml.querySelectorAll('edge');
+                
+                for(var i = 0; i < allNodes.length; i++){
+                    var node = allNodes[i];
+                    var nodeID = node.getAttribute('id');
+                    var nodeLabel = node.getAttribute('label');
+                    
+                    html = "<p>Node id: " + nodeID + " Node Label: " + nodeLabel + "</p>";
+                    console.log("Node = " + nodeID);
+                    graphData.innerHTML += html;
+                }
+                for(var i = 0; i < allEdges.length; i++){
+                    var edge = allEdges[i];
+                    var edgeID = edge.getAttribute('id');
+                    var edgeSource = edge.getAttribute('source');
+                    var edgeTarget = edge.getAttribute('target');
+                    
+                    html = "<p>Edge id: " + edgeID + " Edge Source: " + edgeSource + " Edge Target: " + edgeTarget + "</p>";
+                    console.log("Edge = " + edgeID);
+                    graphData.innerHTML += html;
+                }
+                
+            }
+            
+            var path = "data/test.xml";
+            xhr.open('GET', path, true);
+            xhr.setRequestHeader("If-Modified-Since", "Sat, 1 Jan 2010 00:00:00 GMT");
+            xhr.send();
+            
+        }
+    
+    </script>
+    
 </head>
 
 <body>
-    <h1>VR Graph/Network Data Visualization Application Testing (Using sigma.js)</h1>
+    <h1>VR Graph/Network Data Visualization Application Testing (Loading XML)</h1>
+    <div id="graphData">
+    
+    </div>
+    <!--
     <div id="sigma-container"></div>
     <script src="sigma/sigma.js"></script>
     <script src="sigma/plugins/sigma.parsers.gexf.min.js"></script>
@@ -98,7 +159,7 @@
         
         
     </script>
-
+    -->
 </body>
 
 </html>
