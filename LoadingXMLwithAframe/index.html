@@ -31,6 +31,7 @@
             var allNodes = [];
             var allEdges = [];
             // may need an additional array to store node positions to uue for edge position calculation
+            var nodePositions = [];
             
             // get scene element
             var aScene = document.querySelector("#scene");
@@ -67,6 +68,12 @@
                         nodePositionY = nodeID;
                     }
                     
+                    // Set a random Z coordinate for the node (within a range of values)
+                    var randomZ = Math.floor((Math.random() * -10) -5);
+                    
+                    // Save the node's position
+                    nodePositions[i] = [nodePositionX / 100, nodePositionY / 100, randomZ];
+                    
                     // get the current node's size
                     var nodeSize = node.querySelector('size').getAttribute('value');
                     if(!nodeSize){
@@ -88,10 +95,10 @@
                      if(!nodeColorB){
                          nodeColorB = 0;
                      }
-                    
+                  
                     // Create the sphere for the node
                     var nodeSphere = document.createElement('a-sphere');
-                    nodeSphere.setAttribute('position', '' + nodePositionX / 100 + ' ' + nodePositionY / 100 + ' -15');
+                    nodeSphere.setAttribute('position', '' + nodePositionX / 100 + ' ' + nodePositionY / 100 + ' ' + randomZ);
                     nodeSphere.setAttribute('radius', nodeSize / 100);
                     nodeSphere.setAttribute('color', 'rgb(' + nodeColorR + ',' + nodeColorG + ',' + nodeColorB +')');
                     aScene.appendChild(nodeSphere);
@@ -99,7 +106,7 @@
                     // create the text for the node
                     var nodeText = document.createElement('a-text');
                     nodeText.setAttribute('value', nodeLabel);
-                    nodeText.setAttribute('position', '' + (nodePositionX / 100) - ((nodeSize / 100) /2) + ' ' + nodePositionY / 100 + ' -14.2');
+                    nodeText.setAttribute('position', '' + (nodePositionX / 100) - ((nodeSize / 100) /2) + ' ' + nodePositionY / 100 + '  ' + (randomZ + .8));
                     nodeText.setAttribute('color', "#000000");
                     nodeText.setAttribute('opacity', "0.5");
                     aScene.appendChild(nodeText);
@@ -120,6 +127,41 @@
                     var edgeSource = edge.getAttribute('source');
                     // get current edge's target
                     var edgeTarget = edge.getAttribute('target');
+                    
+                    var sourcePosition = nodePositions[Math.floor(edgeSource)];
+                    var targetPosition = nodePositions[Math.floor(edgeTarget)];
+                    var xDistance = targetPosition[0] - sourcePosition[0];
+                    var yDistance = targetPosition[1] - sourcePosition[1];
+                    var zDistance = targetPosition[2] - sourcePosition[2];
+                    
+                    
+                    // Create cylinder for edge
+                    var nodeEdge = document.createElement("a-cylinder");
+                    nodeEdge.setAttribute('position', '' + sourcePosition[0] + ' ' + sourcePosition[1] + ' ' + (sourcePosition[2] + (Math.abs(xDistance) / 2)));
+                    nodeEdge.setAttribute('height', Math.abs(xDistance));
+                    nodeEdge.setAttribute('radius', 0.015);
+                    nodeEdge.setAttribute('color', "#000000")
+                    nodeEdge.setAttribute('rotation', "90 0 0")
+                    aScene.appendChild(nodeEdge);
+                    
+                    
+                    var nodeEdge2 = document.createElement("a-cylinder");
+                    nodeEdge2.setAttribute('position', '' + sourcePosition[0] + ' ' + (sourcePosition[1] + (Math.abs(yDistance) / 2)) + ' ' + sourcePosition[2]);
+                    nodeEdge2.setAttribute('height', Math.abs(yDistance));
+                    nodeEdge2.setAttribute('radius', 0.015);
+                    nodeEdge2.setAttribute('color', "#000000")
+                    //nodeEdge2.setAttribute('rotation', "0 0 0")
+                    aScene.appendChild(nodeEdge2);
+                    
+                    var nodeEdge3 = document.createElement("a-cylinder");
+                    nodeEdge3.setAttribute('position', '' + (sourcePosition[0] + (Math.abs(zDistance) / 2)) + ' ' + sourcePosition[1] + ' ' + sourcePosition[2]);
+                    nodeEdge3.setAttribute('height', Math.abs(zDistance));
+                    nodeEdge3.setAttribute('radius', 0.015);
+                    nodeEdge3.setAttribute('color', "#000000")
+                    nodeEdge3.setAttribute('rotation', "0 0 90")
+                    aScene.appendChild(nodeEdge3);
+                    
+                   
                     
                 }
                 
