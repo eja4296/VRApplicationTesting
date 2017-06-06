@@ -127,24 +127,37 @@
                     var edgeSource = edge.getAttribute('source');
                     // get current edge's target
                     var edgeTarget = edge.getAttribute('target');
-                    
+                     /*
                     var sourcePosition = nodePositions[Math.floor(edgeSource)];
                     var targetPosition = nodePositions[Math.floor(edgeTarget)];
-                    var xDistance = targetPosition[0] - sourcePosition[0];
-                    var yDistance = targetPosition[1] - sourcePosition[1];
-                    var zDistance = targetPosition[2] - sourcePosition[2];
+                    var xDistance = sourcePosition[0] - targetPosition[0];
+                    var yDistance = sourcePosition[1] - targetPosition[1];
+                    var zDistance = sourcePosition[2] - targetPosition[2];
                     
+                    //var w = Math.sqrt((xDistance * xDistance) + (yDistance * yDistance));
+                    var totalDistance = Math.sqrt((xDistance * xDistance) + (yDistance * yDistance) + (zDistance * zDistance));
                     
+                    var zRot = Math.atan((yDistance / xDistance));
+                    var xRot = Math.atan((yDistance / zDistance));
+                    var yRot = Math.atan((zDistance / xDistance));
+                    
+                    zRot *= (180 / Math.PI);
+                    yRot *= (180 / Math.PI);
+                    xRot *= (180 / Math.PI);
+                  
                     // Create cylinder for edge
                     var nodeEdge = document.createElement("a-cylinder");
-                    nodeEdge.setAttribute('position', '' + sourcePosition[0] + ' ' + sourcePosition[1] + ' ' + (sourcePosition[2] + (Math.abs(xDistance) / 2)));
-                    nodeEdge.setAttribute('height', Math.abs(xDistance));
+                    
+                    //nodeEdge.setAttribute('position', '' + (sourcePosition[0] + (xDistance / 2)) + ' ' + (sourcePosition[1] + (yDistance / 2)) + ' ' + ((sourcePosition[2]) + (zDistance / 2)));
+                    nodeEdge.setAttribute('position', '' + (sourcePosition[0]) + ' ' + (sourcePosition[1]) + ' ' + ((sourcePosition[2])));
+                    nodeEdge.setAttribute('height', Math.abs(totalDistance));
                     nodeEdge.setAttribute('radius', 0.015);
                     nodeEdge.setAttribute('color', "#000000")
-                    nodeEdge.setAttribute('rotation', "90 0 0")
+                    nodeEdge.setAttribute('rotation', '' + xRot + ' ' + yRot + ' ' + zRot + '');
                     aScene.appendChild(nodeEdge);
                     
                     
+                     
                     var nodeEdge2 = document.createElement("a-cylinder");
                     nodeEdge2.setAttribute('position', '' + sourcePosition[0] + ' ' + (sourcePosition[1] + (Math.abs(yDistance) / 2)) + ' ' + sourcePosition[2]);
                     nodeEdge2.setAttribute('height', Math.abs(yDistance));
@@ -160,7 +173,7 @@
                     nodeEdge3.setAttribute('color', "#000000")
                     nodeEdge3.setAttribute('rotation', "0 0 90")
                     aScene.appendChild(nodeEdge3);
-                    
+                    */
                    
                     
                 }
@@ -168,7 +181,7 @@
             }
             
             // store the path to the data file
-            var path = "data/miserables.xml";
+            var path = "data/gephi.exported.xml";
             
             // open the xml request
             xhr.open('GET', path, true);
