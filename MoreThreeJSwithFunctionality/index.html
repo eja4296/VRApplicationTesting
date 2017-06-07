@@ -9,7 +9,8 @@
             
         }
     </style>
-    <meta charset="utf-8"/>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0"/>
     
 </head>
 
@@ -19,24 +20,57 @@
     <script src="js/OrbitControls.js"></script>
     <script src="js/VRControls.js"></script>
     <script src="js/webvr-ui.min.js"></script>
+
     <script>
+        
+        // 'use strict'
         
         (function init(){
             // build scene, camera, renderer
             var scene = new THREE.Scene();
+            var raycaster = new THREE.Raycaster();
             var aspect = window.innerWidth / window.innerHeight;
             var camera = new THREE.PerspectiveCamera(75, aspect, 0.1, 1000);
             var renderer = new THREE.WebGLRenderer();
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setClearColor(0xffffff, 1);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.sortObjects = false;
             document.body.appendChild(renderer.domElement);
-            /*
-            var geo = new THREE.BoxGeometry(1,1,1);
-            var mat = new THREE.MeshNormalMaterial({color: 0x00ff00});
-            var cube = new THREE.Mesh(geo, mat);
-            scene.add(cube);
-           */
+            
+            window.addEventListener('resize', onWindowResize, false);
+            
+            window.addEventListener('mousemove', onDocumentMouseMove, false);
+            
+            var onWindowResize = function(){
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerWidth);
+                //render();
+            };
+            
+            var onDocumentMouseMove = function(event){
+                //event.preventDefault();
+                mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+                mouse.y = (event.clientY / window.innerHeight) * 2 + 1;
+            };
+            
+            //var mouse = new THREE.Vector2(), INTERSECTED;
+            var mouse = new THREE.Vector2(), INTERSECTED;
+            
+            var container = document.createElement( 'div' );
+            document.body.appendChild( container );
+
+            
             camera.position.z = 5;
+            
+            var light = new THREE.DirectionalLight(0xffffff);
+            light.position.set(0, 0, 10).normalize();
+            scene.add(light);
+            var light2 = new THREE.DirectionalLight(0xffffff);
+            light2.position.set(0,0,-10).normalize();
+            scene.add(light2);
+            
 
             // Network/Graph information
             var allNodes = [];
@@ -122,7 +156,11 @@
 
                         // Create the sphere for the node
                         var sphereGeometry = new THREE.SphereGeometry(nodeSize / 100,32,32);
-                        var sphereMaterial = new THREE.MeshBasicMaterial({color: 'rgb(' + nodeColorR + ',' + nodeColorG + ',' + nodeColorB +')'});
+                        
+                        var shine = Math.pow(2, i * 10);
+                        var diffuseColor = new THREE.Color().setHSL(i, 0.5, i * 0.5).multiplyScalar();
+                        
+                        var sphereMaterial = new THREE.MeshLambertMaterial({color: 'rgb(' + nodeColorR + ',' + nodeColorG + ',' + nodeColorB +')'});
                         var nodeSphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
                         scene.add(nodeSphere);
                         
@@ -130,16 +168,7 @@
                         nodeSphere.position.x = nodePositionX / 100;
                         nodeSphere.position.y = nodePositionY / 100;
                         nodeSphere.position.z = randomZ;
-                        /*
-                        var nodeSphere = document.createElement('a-sphere');
-                        nodeSphere.setAttribute('position', '' + nodePositionX / 100 + ' ' + nodePositionY / 100 + ' ' + randomZ);
                         
-
-                        // create the text for the node
-                        var nodeText = document.createElement('a-text');
-                        nodeText.setAttribute('value', nodeLabel);
-                        nodeText.setAttribute('position', '' + (nodePositionX / 100) - ((nodeSize / 100) /2) + ' ' + nodePositionY / 100 + '  ' + (randomZ + .8));
-                        */
 
                     }
 
@@ -160,21 +189,7 @@
                         
                         var sourcePosition = nodePositions[Math.floor(edgeSource)];
                         var targetPosition = nodePositions[Math.floor(edgeTarget)];
-                        /*
-                        var xDistance = sourcePosition[0] - targetPosition[0];
-                        var yDistance = sourcePosition[1] - targetPosition[1];
-                        var zDistance = sourcePosition[2] - targetPosition[2];
-                        */
                         
-                        
-                        var lineGeometry = new THREE.Geometry();
-                        var lineMaterial = new THREE.LineBasicMaterial({color: 0x000000});
-                        lineGeometry.vertices.push(new THREE.Vector3(sourcePosition[0], sourcePosition[1], sourcePosition[2]));
-                        lineGeometry.vertices.push(new THREE.Vector3(targetPosition[0], targetPosition[1], targetPosition[2]));
-                        var line = new THREE.Line(lineGeometry, lineMaterial);
-                        scene.add(line);
-                        
-                        /*
                         var lineGeometry = new THREE.BufferGeometry();
                         var lineMaterial = new THREE.LineBasicMaterial({color: 0x000000});
                         var vertices = new Float32Array([
@@ -183,17 +198,15 @@
                         ]);
                         lineGeometry.addAttribute('position', new THREE.BufferAttribute(vertices, 3));
                         
-                        var line
-                        
                         var line = new THREE.Line(lineGeometry, lineMaterial);
                         scene.add(line);
-                        */
+                        
                 }
                 
             }
             
             // store the path to the data file
-            var path = "data/gephi.exported.xml";
+            var path = "data/miserables.xml";
             
             // open the xml request
             xhr.open('GET', path, true);
@@ -202,11 +215,11 @@
             // send the request
             xhr.send();
             
-        }
+            }
             
             
             
-            controls = new THREE.OrbitControls(camera);
+            var controls = new THREE.OrbitControls(camera);
             //vrControls = new THREE.VRControls(camera);
 
             var options = {};
@@ -216,25 +229,48 @@
             document.body.appendChild(enterVR.domElement);
 
             var render = function() {
-                requestAnimationFrame(render);
-                //cube.rotation.x += 0.01;
-                //cube.rotation.y += 0.01;
-                //cube.rotation.z += 0.01;
+                
+              
+                // raycaster information
+                raycaster.setFromCamera(mouse, camera)
+                /*
+                var intersects = raycaster.intersectObjects( scene.children );
+                
+				if ( intersects.length > 0 ) {
+                    //console.log("intersecting");
+                    
+					if ( INTERSECTED != intersects[ 0 ].object ) {
+						if ( INTERSECTED ) INTERSECTED.material.emissive.setHex( INTERSECTED.currentHex );
+						INTERSECTED = intersects[ 0 ].object;
+						INTERSECTED.currentHex = INTERSECTED.material.emissive.getHex();
+						INTERSECTED.material.emissive.setHex( 0xff0000 );
+                        
+                        //intersects[0].object.material.color.set(0x00ff00);
+                        
+					}
+                    
+				} else {                
+					if ( INTERSECTED ) INTERSECTED.material.emissive.setHex( INTERSECTED.currentHex );
+                    
+                    
+					INTERSECTED = null;
+                    
+				}
+                */
                 controls.update();
                 //vrControls.update();
                 renderer.render(scene, camera);
             };
-
-            var inWindowResize = function(){
-                camera.aspect = window.innerWidth / window.innerHeight;
-                camera.updateProjectionMatrix();
-                renderer.setSize(window.innerWidth, window.innerWidth);
-                //render();
-            }
             
+            var animate = function(){
+                requestAnimationFrame(animate);
+                render();
+            }
+
+            
+            
+            animate();
             loadData();
-            console.log("called");
-            render();
         }());
         
     </script>

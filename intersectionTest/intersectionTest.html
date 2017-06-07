@@ -1,42 +1,109 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
+	<head>
+		<title>three.js webgl - interactive cubes</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<style>
+			body {
+				font-family: Monospace;
+				background-color: #f0f0f0;
+				margin: 0px;
+				overflow: hidden;
+			}
+		</style>
+	</head>
+	<body>
 
-<head>
-    <title>ThreeJSTest</title>
-    <style>
-        html, body {
+		<script src="js/three.min.js"></script>
+        <script src="js/OrbitControls.js"></script>
+        <script src="js/VRControls.js"></script>
+        <script src="js/webvr-ui.min.js"></script>
+		<script src="js/stats.min.js"></script>
+
+		<script>
+			var container, stats;
+			var camera, scene, raycaster, renderer;
+			var mouse = new THREE.Vector2(), INTERSECTED;
+			var radius = 100, theta = 0;
+            var controls
+			init();
+			animate();
+            loadData();
+			function init() {
+				container = document.createElement( 'div' );
+				document.body.appendChild( container );
+				var info = document.createElement( 'div' );
+				info.style.position = 'absolute';
+				info.style.top = '10px';
+				info.style.width = '100%';
+				info.style.textAlign = 'center';
+				info.innerHTML = '<a href="http://threejs.org" target="_blank">three.js</a> webgl - interactive cubes';
+				container.appendChild( info );
+				camera = new THREE.PerspectiveCamera( 70, window.innerWidth / window.innerHeight, 1, 10000 );
+				scene = new THREE.Scene();
+                //var aspect = window.innerWidth / window.innerHeight;
+				var light = new THREE.DirectionalLight( 0xffffff, 1 );
+				light.position.set( 1, 1, 1 ).normalize();
+				scene.add( light );
+				var geometry = new THREE.BoxBufferGeometry( 20, 20, 20 );
+				for ( var i = 0; i < 2000; i ++ ) {
+					var object = new THREE.Mesh( geometry, new THREE.MeshLambertMaterial( { color: Math.random() * 0xffffff } ) );
+					object.position.x = Math.random() * 800 - 400;
+					object.position.y = Math.random() * 800 - 400;
+					object.position.z = Math.random() * 800 - 400;
+					object.rotation.x = Math.random() * 2 * Math.PI;
+					object.rotation.y = Math.random() * 2 * Math.PI;
+					object.rotation.z = Math.random() * 2 * Math.PI;
+					object.scale.x = Math.random() + 0.5;
+					object.scale.y = Math.random() + 0.5;
+					object.scale.z = Math.random() + 0.5;
+					scene.add( object );
+				}
+				raycaster = new THREE.Raycaster();
+				renderer = new THREE.WebGLRenderer();
+				renderer.setClearColor( 0xf0f0f0 );
+				renderer.setPixelRatio( window.devicePixelRatio );
+				renderer.setSize( window.innerWidth, window.innerHeight );
+				renderer.sortObjects = false;
+				container.appendChild(renderer.domElement);
+				stats = new Stats();
+				container.appendChild( stats.dom );
+                
+                controls = new THREE.OrbitControls(camera);
+                
+				document.addEventListener( 'mousemove', onDocumentMouseMove, false );
+				//
+				window.addEventListener( 'resize', onWindowResize, false );
+			}
+            
+            
            
             
-        }
-    </style>
-    <meta charset="utf-8"/>
-    
-</head>
-
-<body>
-
-    <script src="js/three.min.js"></script>
-    <script src="js/OrbitControls.js"></script>
-    <script src="js/VRControls.js"></script>
-    <script src="js/webvr-ui.min.js"></script>
-    <script>
-        
-        (function init(){
-            // build scene, camera, renderer
-            var scene = new THREE.Scene();
-            var aspect = window.innerWidth / window.innerHeight;
-            var camera = new THREE.PerspectiveCamera(75, aspect, 0.1, 1000);
-            var renderer = new THREE.WebGLRenderer();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setClearColor(0xffffff, 1);
-            document.body.appendChild(renderer.domElement);
+            //var camera = new THREE.PerspectiveCamera(75, aspect, 0.1, 1000);
+            //var renderer = new THREE.WebGLRenderer();
+            //renderer.setSize(window.innerWidth, window.innerHeight);
+            //renderer.setClearColor(0xffffff, 1);
+            //document.body.appendChild(renderer.domElement);
             /*
             var geo = new THREE.BoxGeometry(1,1,1);
             var mat = new THREE.MeshNormalMaterial({color: 0x00ff00});
             var cube = new THREE.Mesh(geo, mat);
             scene.add(cube);
            */
+
+
+            
             camera.position.z = 5;
+            
+            
+            var light = new THREE.DirectionalLight(0xffffff);
+            light.position.set(0, 0, 10).normalize();
+            scene.add(light);
+            var light2 = new THREE.DirectionalLight(0xffffff);
+            light2.position.set(0,0,-10).normalize();
+            scene.add(light2);
+            
 
             // Network/Graph information
             var allNodes = [];
@@ -122,7 +189,11 @@
 
                         // Create the sphere for the node
                         var sphereGeometry = new THREE.SphereGeometry(nodeSize / 100,32,32);
-                        var sphereMaterial = new THREE.MeshBasicMaterial({color: 'rgb(' + nodeColorR + ',' + nodeColorG + ',' + nodeColorB +')'});
+                        
+                        var shine = Math.pow(2, i * 10);
+                        var diffuseColor = new THREE.Color().setHSL(i, 0.5, i * 0.5).multiplyScalar();
+                        
+                        var sphereMaterial = new THREE.MeshPhongMaterial({color: 'rgb(' + nodeColorR + ',' + nodeColorG + ',' + nodeColorB +')'});
                         var nodeSphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
                         scene.add(nodeSphere);
                         
@@ -167,14 +238,14 @@
                         */
                         
                         
+                        /*
                         var lineGeometry = new THREE.Geometry();
                         var lineMaterial = new THREE.LineBasicMaterial({color: 0x000000});
                         lineGeometry.vertices.push(new THREE.Vector3(sourcePosition[0], sourcePosition[1], sourcePosition[2]));
                         lineGeometry.vertices.push(new THREE.Vector3(targetPosition[0], targetPosition[1], targetPosition[2]));
                         var line = new THREE.Line(lineGeometry, lineMaterial);
                         scene.add(line);
-                        
-                        /*
+                        */
                         var lineGeometry = new THREE.BufferGeometry();
                         var lineMaterial = new THREE.LineBasicMaterial({color: 0x000000});
                         var vertices = new Float32Array([
@@ -183,11 +254,9 @@
                         ]);
                         lineGeometry.addAttribute('position', new THREE.BufferAttribute(vertices, 3));
                         
-                        var line
-                        
                         var line = new THREE.Line(lineGeometry, lineMaterial);
                         scene.add(line);
-                        */
+                        
                 }
                 
             }
@@ -202,11 +271,11 @@
             // send the request
             xhr.send();
             
-        }
+            }
             
             
             
-            controls = new THREE.OrbitControls(camera);
+            
             //vrControls = new THREE.VRControls(camera);
 
             var options = {};
@@ -214,32 +283,48 @@
             var enterVR = new webvrui.EnterVRButton(renderer.domElement, options);
             //enterVR.setAttribute('position', '0 0 0');
             document.body.appendChild(enterVR.domElement);
-
-            var render = function() {
-                requestAnimationFrame(render);
-                //cube.rotation.x += 0.01;
-                //cube.rotation.y += 0.01;
-                //cube.rotation.z += 0.01;
-                controls.update();
-                //vrControls.update();
-                renderer.render(scene, camera);
-            };
-
-            var inWindowResize = function(){
-                camera.aspect = window.innerWidth / window.innerHeight;
-                camera.updateProjectionMatrix();
-                renderer.setSize(window.innerWidth, window.innerWidth);
-                //render();
-            }
             
-            loadData();
-            console.log("called");
-            render();
-        }());
-        
-    </script>
-    
-</body>
+			function onWindowResize() {
+				camera.aspect = window.innerWidth / window.innerHeight;
+				camera.updateProjectionMatrix();
+				renderer.setSize( window.innerWidth, window.innerHeight );
+			}
+			function onDocumentMouseMove( event ) {
+				event.preventDefault();
+				mouse.x = ( event.clientX / window.innerWidth ) * 2 - 1;
+				mouse.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
+			}
+			//
+			function animate() {
+				requestAnimationFrame( animate );
+				render();
+				stats.update();
+			}
+			function render() {
+                controls.update();
+				theta += 0.1;
+				camera.position.x = radius * Math.sin( THREE.Math.degToRad( theta ) );
+				camera.position.y = radius * Math.sin( THREE.Math.degToRad( theta ) );
+				camera.position.z = radius * Math.cos( THREE.Math.degToRad( theta ) );
+				camera.lookAt( scene.position );
+				camera.updateMatrixWorld();
+				// find intersections
+				raycaster.setFromCamera( mouse, camera );
+				var intersects = raycaster.intersectObjects( scene.children );
+				if ( intersects.length > 0 ) {
+					if ( INTERSECTED != intersects[ 0 ].object ) {
+						if ( INTERSECTED ) INTERSECTED.material.emissive.setHex( INTERSECTED.currentHex );
+						INTERSECTED = intersects[ 0 ].object;
+						INTERSECTED.currentHex = INTERSECTED.material.emissive.getHex();
+						INTERSECTED.material.emissive.setHex( 0xff0000 );
+					}
+				} else {
+					if ( INTERSECTED ) INTERSECTED.material.emissive.setHex( INTERSECTED.currentHex );
+					INTERSECTED = null;
+				}
+				renderer.render( scene, camera );
+			}
+		</script>
 
-
+	</body>
 </html>
