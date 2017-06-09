@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8"/>
+    <title>VR Graph/Network Data Visualization Application Prototype</title>
+    <style>
+        #sigma-container{
+            height: 750px;
+            border: 1px solid black;
+        }
+    </style>
+    <!-- import aFrame Library -->
+    <script src="https://aframe.io/releases/0.5.0/aframe.min.js"></script>
+    <script src="js/aframe-line-component.min.js"></script>
+    <script src="js/aframe-crawling-cursor.min.js"></script>
+    
+    
+    <!-- Main Script -->
+    <script>
+
+        (function(){
+            'use strict';
+            
+            // variables
+            var allNodes;
+            var allEdges;
+            var nodePositions;
+            var aScene;  
+
+            // Starter function
+            function init(){
+                // Store Nodes and Edges
+                allNodes = [];
+                allEdges = [];
+                // may need an additional array to store node positions to uue for edge position calculation
+                nodePositions = [];
+                // get scene element
+                aScene = document.querySelector("#scene");
+                
+                AFRAME.registerComponent('cursor-listener', {
+                  ini: function () {
+                    var COLORS = ['red', 'green', 'blue'];
+                    this.el.addEventListener('click', function (evt) {
+                      var randomIndex = Math.floor(Math.random() * COLORS.length);
+                      this.setAttribute('material', 'color', COLORS[randomIndex]);
+                      console.log('I was clicked at: ', evt.detail.intersection.point);
+                    });
+                  }
+                });
+                
+                loadData();
+            }
+
+            // Load data from xml file
+            function loadData(){
+                var xhr = new XMLHttpRequest();
+
+                // Once XML Request has loaded
+                xhr.onload = function(){
+                    // Store xml response in variable
+                    var xml = xhr.responseXML;
+
+                    // get nodes and edges from xml
+                    allNodes = xml.querySelectorAll('node');
+                    allEdges = xml.querySelectorAll('edge');
+
+                    // Loop through all nodes
+                    // Get all node attributes
+                    // Create sphere for node's position and size
+                    // Create text for label
+                    for(var i = 0; i < allNodes.length; i++){
+                        // get the current node
+                        var node = allNodes[i];
+                        // get the current node's id
+                        var nodeID = node.getAttribute('id');
+                        // get the current node's label
+                        var nodeLabel = node.getAttribute('label');
+
+                        // get the current node's x position
+                        var nodePositionX = node.querySelector('position').getAttribute('x');
+                        if(!nodePositionX){
+                            nodePositionX = nodeID;
+                        }
+                        // get the current node's y position
+                        var nodePositionY = node.querySelector('position').getAttribute('y');
+                         if(!nodePositionY){
+                            nodePositionY = nodeID;
+                        }
+
+                        // Set a random Z coordinate for the node (within a range of values)
+                        var randomZ = Math.floor((Math.random() * -10) -5);
+
+                        // Save the node's position
+                        nodePositions[i] = [nodePositionX / 100, nodePositionY / 100, randomZ];
+
+                        // get the current node's size
+                        var nodeSize = node.querySelector('size').getAttribute('value');
+                        if(!nodeSize){
+                            nodeSize = 0.1;
+                        }
+
+                        // get the current node's r color value
+                        var nodeColorR = node.querySelector('color').getAttribute('r');
+                         if(!nodeColorR){
+                             nodeColorR = 0;
+                         }
+                         // get the current node's g color value
+                        var nodeColorG = node.querySelector('color').getAttribute('g');
+                         if(!nodeColorG){
+                             nodeColorG = 0;
+                         }
+                         // get the current node's b color value
+                        var nodeColorB = node.querySelector('color').getAttribute('b');
+                         if(!nodeColorB){
+                             nodeColorB = 0;
+                         }
+
+                        // Create the sphere for the node
+                        var nodeSphere = document.createElement('a-sphere');
+                        nodeSphere.setAttribute('position', '' + nodePositionX / 100 + ' ' + nodePositionY / 100 + ' ' + randomZ);
+                        nodeSphere.setAttribute('radius', nodeSize / 100);
+                        nodeSphere.setAttribute('color', 'rgb(' + nodeColorR + ',' + nodeColorG + ',' + nodeColorB +')');
+                        nodeSphere.setAttribute('cursor-listener', true);
+                        aScene.appendChild(nodeSphere);
+
+                        // create the text for the node
+                        var nodeText = document.createElement('a-text');
+                        nodeText.setAttribute('value', nodeLabel);
+                        nodeText.setAttribute('position', '' + (nodePositionX / 100) - ((nodeSize / 100) /2) + ' ' + nodePositionY / 100 + '  ' + (randomZ + .8));
+                        nodeText.setAttribute('color', "#000000");
+                        nodeText.setAttribute('opacity', "0.5");
+                        nodeText.setAttribute('class', 'ignore-ray');
+
+                        aScene.appendChild(nodeText);
+                    }
+
+                    // Loop through all edges
+                    // Get all edge attributes
+                    for(var i = 0; i < allEdges.length; i++){
+                        // get current edge
+                        var edge = allEdges[i];
+                        // get current edge's id
+                        var edgeID = edge.getAttribute('id');
+                        // get current edge's source
+                        var edgeSource = edge.getAttribute('source');
+                        // get current edge's target
+                        var edgeTarget = edge.getAttribute('target');
+
+                        var sourcePosition = nodePositions[Math.floor(edgeSource)];
+                        var targetPosition = nodePositions[Math.floor(edgeTarget)];
+                        
+                        var edge = document.createElement('a-entity');
+                        edge.setAttribute('line', {
+                            start: '' + sourcePosition[0] + ' ' + sourcePosition[1] + ' ' + sourcePosition[2] + '',
+                            end: '' + targetPosition[0] + ' ' + targetPosition[1] + ' ' + targetPosition[2] + '',
+                            color: '#000'
+                        });
+                        
+                        edge.setAttribute('class', "ignore-ray");
+                        aScene.appendChild(edge);
+
+                    }
+
+                }
+
+                // store the path to the data file
+                var path = "data/miserables.xml";
+
+                // open the xml request
+                xhr.open('GET', path, true);
+                // set request header
+                xhr.setRequestHeader("If-Modified-Since", "Sat, 1 Jan 2010 00:00:00 GMT");
+                // send the request
+                xhr.send();
+
+            }
+
+            // Load init when page has loaded
+            window.onload = init;
+            
+        }());
+
+    </script>
+    
+</head>
+
+<body>
+    
+    <a-scene id="scene" antialias="true">
+        
+        <a-entity id='cursor' cursor="fuse: true; fuseTimeout: 500"
+              position="0 0 -1"
+              geometry="primitive: ring"
+              material="color: black; shader: flat">
+              <a-animation begin="click" easing="ease-in" attribute="scale"
+                           fill="backwards" from="0.01 0.01 0.01" to="0.1 0.1 0.1"></a-animation>
+              <a-animation begin="cursor-fusing" easing="ease-in" attribute="scale"
+                           fill="forwards" from="0.1 0.1 0.1" to="0.01 0.01 0.01"></a-animation>
+                
+        </a-entity>
+        
+        <a-camera raycaster crawling-cursor='target: #cursor'>
+            
+        </a-camera>
+        
+      <!-- <a-ring id='cursor' radius-inner='0.05' radius-outer='0.1'></a-ring>
+      <a-camera raycaster crawling-cursor></a-camera>
+         
+        <a-entity id="cursor" scale="0.02 0.02 0.02" geometry="primitive: sphere" material="side: double; color: yellow; shader: flat">
+        <a-animation begin="cursor-fusing" dur="1500" easing="ease-in" attribute="material.color" fill="forwards" from="#FFF" to="#F00"></a-animation>
+        <a-animation begin="click" dur="1" easing="ease-in" attribute="material.color" fill="backwards" from="#F00" to="#FFF"></a-animation>
+        </a-entity>
+        <a-camera raycaster sticky-cursor="fuse: true; fuseTimeout: 1500; cursorId: #cursor; hoverDistance: 0;"></a-camera>
+        -->
+        
+      <a-sky color="#ECECEC" class='ignore-ray'></a-sky>
+      <a-plane color="#CEC" height='500' width='500' position='0 -15 0' rotation="-90 0 0" class='ignore-ray'></a-plane>
+      <a-sphere color="#99D" radius="50" scale='-1 1 1' position='0 -15 0' wireframe="true" class='ignore-ray'></a-sphere>
+    </a-scene>
+    
+</body>
+
+</html>
