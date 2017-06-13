@@ -1,0 +1,18 @@
+{
+  "name": "newaframetesting",
+  "version": "1.0.0",
+  "description": "TestingCommunityAframeComponents",
+  "main": "index.js",
+  "dependencies": {
+    "aframe-crawling-cursor": "^1.0.7",
+    "aframe-line-component": "^1.0.1",
+    "aframe-selectable-component": "^1.6.0",
+    "aframe-tooltip-component": "^0.1.1"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Erik Azzarano",
+  "license": "ISC"
+}
