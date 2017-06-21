@@ -12,7 +12,10 @@
     <!-- import aFrame Library -->
     <script src="https://aframe.io/releases/0.5.0/aframe.min.js"></script>
 
-    <script src="https://d3js.org/d3.v4.min.js"></script>
+    <script src="https://d3js.org/d3.v3.min.js"></script>
+    <script src="js/d3-force.min.js"></script>
+    
+    <script src="js/aframe-line-component.min.js"></script>
     
     <!-- Main Script -->
    
@@ -29,22 +32,108 @@
     </a-scene>
     
      <script>
-         
-        var aScened3 = d3.select('#scene');
+         /*
+        var aScened3 = d3.select('a-scene');
         
-        var data = [5, 10, -5, -10];
+        var data = [5, 10, 2, 7];
         
         var spheres = aScened3.selectAll('a-sphere.testNodes')
             .data(data)
-            .enter()
-                .append('a-sphere').classed('testNodes', true)
-                .attr({ position: function(d,i){
+            .enter().append('a-sphere').classed('testNodes', true)
+                .attr('position', function(d,i){
                     var x = d;
                     var y = i;
                     var z = 0;
+                    console.log(x + ' ' + y + ' ' + z);
                     return x + ' ' + y + ' ' + z;
-                }
-                });         
+                
+                });    
+         */
+         
+         var scene = d3.select('a-scene');
+         
+         var width = 10;
+         var height = 8;
+         
+         d3.json("data/miserables.json", function(error, graph) {
+          if (error) throw error;
+             console.dir(graph);
+          var nodes = graph.nodes,
+              nodeById = d3.map(nodes, function(d) { return d.id; }),
+              links = graph.links,
+              bilinks = [];
+
+          links.forEach(function(link) {
+            var s = link.source = nodeById.get(link.source),
+                t = link.target = nodeById.get(link.target),
+                i = {}; // intermediate node
+            //nodes.push(i);
+            //links.push({source: s, target: i}, {source: i, target: t});
+            //bilinks.push([s, i, t]);
+          });
+             /*
+              var nodes= [
+             {x: width/3, y: height/2, z: 0},
+             {x: 2*width/3, y: height/2, z: 0}
+         ];
+         
+         var links = [
+             {source: 0, target: 1}
+         ];
+         */
+         var force = d3.layout.force()
+            .size([100, 100])
+            .nodes(nodes)
+            .links(links);
+         
+         force.linkDistance(width/2);
+         
+         var node = scene.selectAll('.node')
+            .data(nodes)
+            .enter().append('a-sphere')
+            .attr('class', 'node');
+         
+         var link = scene.selectAll('.link')
+            .data(links)
+            .enter().append('line')
+            .attr('class', 'link')
+            //.attr('line', 'true');
+
+         
+         force.on('end', function(){
+             node.attr('radius', width / 25)
+                 .attr('position', function(d){
+                    return '' + d.x / 5 + ' ' + d.y / 5 + ' ' + d.x/d.y + '';
+                })
+             
+             /*
+             link.attr('line', {
+                 start: funtion(d){
+                    return '' + d.source.x + ' ' + d.source.y + ' 0';
+                    },
+                 end: function(d){
+                    return '' + d.target.x + ' ' + d.target.y + ' 0';
+                    }
+             })
+            */
+             
+             link.attr('x1', function(d) {return d.source.x;})
+                .attr('y1', function(d) {return d.source.y;})
+                .attr('x2', function(d) {return d.target.x;})
+                .attr('y2', function(d) {return d.target.y;});
+             
+         });
+         
+         force.start();
+
+
+        });
+         
+        
+         
+         
+         
+         
 
     </script>
     
