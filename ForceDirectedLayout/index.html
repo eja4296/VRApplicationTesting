@@ -47,6 +47,9 @@
             
             var nodeSizes = [];
             var forceOnNode = []; // needs to be a vector
+            var neighbors;
+            var nodeSpeed;
+            var nodeDirection;
 
 
             // Starter function
@@ -55,6 +58,9 @@
                 allNodes = [];
                 allEdges = [];
                 nodePositions = [];
+                neighbors = [];
+                nodeSpeed = [];
+                nodeDirection = [];
                 // get scene element
                 aScene = document.querySelector("#scene");
                 aScened3 = d3.select('#scene');
@@ -77,9 +83,12 @@
                   z: 0
                 };
                 
-                for(var i = 0; i < 100; i++){
-                    //nodeSizes.push(0);
-                    forceOnNode[i] = 0;
+                for(var i = 0; i < 1000; i++){
+                    nodePositions[i] = new THREE.Vector3(0, 0, 0);
+                    forceOnNode[i] = new THREE.Vector3(0, 0, 0);
+                    nodeDirection[i] = new THREE.Vector3(0, 0, 0);
+                    nodeSpeed[i] = new THREE.Vector3(0, 0, 0);
+                    neighbors[i] = [];
                 }
               
                 planets = [];
@@ -281,39 +290,91 @@
             }
             
             function calcForce(){
+                requestAnimationFrame(calcForce);
+                // Constants
                 var springConstant = 8;
                 var coulombConstant = 8.99 * Math.pow(10,9);
+                
+                
+                
+                // Calculate spring force for neighbor nodes (attractive)
                 for(var i = 0; i < allNodes.length; i++){
-                    var node1Pos = new THREE.Vector3(nodePositions[i][0], nodePositions[i][1], nodePositions[i][2]);
+                    //var node1Pos = new THREE.Vector3(nodePositions[i][0], nodePositions[i][1], nodePositions[i][2]);
                     
-                    for(var j = 0; j < allNodes.length; j++){
-                        // Calculate spring force (attractive)
+                    for(var j = 0; j < neighbors[i].length; j++){
+                        
                         if (i != j){
-                            var node2Pos = new THREE.Vector3(nodePositions[j][0], nodePositions[j][1], nodePositions[j][2]);
-                            var distance = node1Pos.distanceTo(node2Pos);
-
+                            //var node2Pos = new THREE.Vector3(nodePositions[j][0], nodePositions[j][1], nodePositions[j][2]);
+                            //console.dir(nodePositions[i]);
+                            //console.log(j);
+                            //console.dir(nodePositions);
+                            //console.dir(nodePositions[j]);
+                            var distanceMag = nodePositions[i].distanceTo(nodePositions[j]);
                             
-
-                            var force1 = -springConstant * (distance/ 2);
+                            //console.log(distanceMag);
                             
-                            var charge1 = nodeSizes[i] / 1000000;
-                            var charge2 = nodeSizes[j] / 1000000;
+                            var distanceVec = new THREE.Vector3(0, 0, 0);
+                            distanceVec.subVectors(nodePositions[i], nodePositions[neighbors[i][j]]);
+                            
+                            distanceVec.normalize();
 
-                            // calculate magnetic force (repulsive)
-                            var force2 = coulombConstant * ((charge1 * charge2) / distance); // TOO BIG ///////////////////////////////////////////////////////////////
-
-                            console.log(force1);
-                            console.log(force2);
-
-                            forceOnNode[i] += force1;
-                            forceOnNode[i] += force2;
+                            var springForce = distanceVec.multiplyScalar(-springConstant * (distanceMag/ 2));
+                            
+                            forceOnNode[i].addVectors(forceOnNode[i], springForce);
                         }
                         
-                        
+                    }
+                    
+                    // Calculate magnetic force for all nodes (repulsive)
+                    for(var j = 0; j < allNodes.length; j++){
+                        if(i != j){
+                            //var node2Pos = new THREE.Vector3(nodePositions[j][0], nodePositions[j][1], nodePositions[j][2]);
+                            //console.dir(nodePositions);
+                            var distanceMag = nodePositions[i].distanceTo(nodePositions[j]);
+                            
+                            var distanceVec = new THREE.Vector3(0, 0, 0);
+                            
+                            var charge1 = nodeSizes[i] / 100000;
+                            var charge2 = nodeSizes[j] / 100000;
+
+                            var magneticForce = distanceVec.multiplyScalar(-1 * coulombConstant * ((charge1 * charge2) / (distanceMag * distanceMag))); // TOO BIG ///////////////////////////////////////////////////////////////
+
+
+                            forceOnNode[i].addVectors(forceOnNode[i], magneticForce);
+                        }   
                         
                     }
+                    
+                    
                 }
-                console.dir(forceOnNode);
+                //console.dir(forceOnNode);
+                
+                applyForce();
+            }
+            
+            function applyForce(){
+                //console.dir(forceOnNode);
+                for(var i = 0; i < allNodes.length; i++){
+                    var acceleration = new THREE.Vector3(0,0,0)
+                    acceleration = forceOnNode[i].divideScalar(nodeSizes[i]);
+                    
+                    var newSpeed = new THREE.Vector3(0, 0, 0);
+                    newSpeed.addVectors(nodeSpeed[i], acceleration.divideScalar(1000));
+                    
+                    nodeSpeed[i] = newSpeed;
+                     
+                    nodePositions[i].addVectors(nodeSpeed[i], nodePositions[i]);
+                    
+                    //console.dir(nodePositions[i]);
+                }
+                updatePosition();
+            }
+            
+            function updatePosition(){
+                for(var i = 0; i < allNodes.length; i++){
+                    allNodes[i].setAttribute('position', '' + nodePositions[i].x + ' ' + nodePositions[i].y + ' ' + nodePositions[i].z);
+                }
+                
             }
             
           
@@ -372,10 +433,14 @@
                         // Set a random Z coordinate for the node (within a range of values)
                         //var randomZ = Math.floor((Math.random() * -10) -5);
 
-
+                        //console.dir(nodePositionX);
+                        //console.dir(nodePositionY);
+                        //console.dir(randomZ);
                         // Save the node's position
-                        nodePositions[i] = [nodePositionX / 100, nodePositionY / 100, randomZ];
-
+                        nodePositions[i] = new THREE.Vector3((nodePositionX / 100), (nodePositionY / 100), randomZ);
+                        
+                        //forceOnNode[i].addVectors(forceOnNode[i], magneticForce);
+                        
                         // get the current node's size
                         var nodeSize = node.querySelector('size').getAttribute('value');
                         nodeSizes.push(nodeSize);
@@ -446,13 +511,18 @@
                         var sourcePosition = nodePositions[Math.floor(edgeSource)];
                         var targetPosition = nodePositions[Math.floor(edgeTarget)];
                         
+                        neighbors[Math.floor(edgeSource)].push(Math.floor(edgeTarget));
+                        neighbors[Math.floor(edgeTarget)].push(Math.floor(edgeSource));
+                        
+                        
+                        
                         var edge = document.createElement('a-entity');
                         edge.setAttribute('line', {
-                            start: '' + sourcePosition[0] + ' ' + sourcePosition[1] + ' ' + sourcePosition[2] + '',
-                            end: '' + targetPosition[0] + ' ' + targetPosition[1] + ' ' + targetPosition[2] + '',
+                            start: '' + sourcePosition.x + ' ' + sourcePosition.y + ' ' + sourcePosition.z + '',
+                            end: '' + targetPosition.x + ' ' + targetPosition.y + ' ' + targetPosition.z + '',
                             color: '#FFF'
                         });
-                        console.dir(edge);
+                        //console.dir(edge);
                         //edge.setAttribute('cursor-listener', false);
                         edge.setAttribute('class', "ignore-ray");
                         //aScene.appendChild(edge);
@@ -460,7 +530,10 @@
 
                     }
                     
+                    //console.dir(nodePositions);
+                    
                     calcForce();
+                    //console.dir(neighbors);
                     
                     cursor.setAttribute('raycaster', {
                         objects: '.collidable'
