@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8"/>
+    <title>VR Graph/Network Data Visualization Application Prototype</title>
+    
+    <style>
+        
+    </style>
+    
+    <!-- import aFrame Library -->
+    <script src="https://aframe.io/releases/0.5.0/aframe.min.js"></script>
+    <script src="js/aframe-line-component.min.js"></script>
+    <script src="js/aframe-crawling-cursor.min.js"></script>
+    <script src="js/aframe-selectable-component.min.js"></script>
+    <script src="js/aframe-tooltip-component.min.js"></script>
+    <script src="js/aframe-forcegraph-component.min.js"></script>
+    <script src="js/d3.min.js"></script>
+    
+    <!-- Main Script -->
+    <script>
+
+        // IIFE
+        (function(){
+            'use strict';
+            
+            // variables
+            var allNodes;
+            var allEdges;
+            var nodePositions;
+            var aScene;
+            var aScened3;
+            var popUpInfo;
+            var popUpInfoPlane;
+            var popUpImage;
+            var cursor;
+            var entered;
+            var camera;
+            var teleport;
+            var popUpPosition;
+          
+            var rotations = 0;
+            var environmentRadius = 500;
+            var planets;
+            var planetRotation;
+            
+            var nodeSizes = [];
+            var forceOnNode = []; // needs to be a vector
+            
+            var springForceOnNode = [];
+            var magneticForceOnNode = [];
+            
+            var neighbors;
+            var nodeSpeed;
+            var nodeDirection;
+            var continueCalculations = [];
+            
+            var debugLines = [];
+            var prePosition = [];
+            
+            var totalForce = new THREE.Vector3(0, 0, 0);
+            
+            var layoutSpeed = 100;
+            
+            var customGraph = {
+                "nodes": [
+                    {"id":"0","group":1},
+                    {"id":"1","group":1},
+                    {"id":"2","group":1},
+                    {"id":"3","group":1},
+                    {"id":"4","group":1},
+                    
+                    
+                ],
+                
+                "edges":[
+                    {"source": "0", "target": "1"},
+                    {"source": "0", "target": "2"},
+                    {"source": "0", "target": "3"},
+                    {"source": "1", "target": "2"},
+                    {"source": "3", "target": "4"},
+                ]
+                
+            };
+
+
+            // Starter function
+            function init(){
+                // Store Nodes and Edges
+                allNodes = [];
+                allEdges = [];
+                nodePositions = [];
+                neighbors = [];
+                nodeSpeed = [];
+                nodeDirection = [];
+                // get scene element
+                aScene = document.querySelector("#scene");
+                aScened3 = d3.select('#scene');
+                // test image
+                popUpInfo = document.createElement('a-text');
+                popUpInfoPlane = document.createElement('a-plane');
+                popUpImage = document.createElement('a-image');
+                popUpImage.setAttribute('opacity', 0.0);
+                popUpInfoPlane.setAttribute('opacity', 0.0);
+                popUpInfo.setAttribute('opacity', 0.0);
+                aScene.appendChild(popUpInfo);
+                aScene.appendChild(popUpInfoPlane);
+                aScene.appendChild(popUpImage);
+                camera = document.querySelector('#camera');
+                entered = false;
+                cursor = document.querySelector("#cursor");
+                popUpPosition = {
+                  x: 0,
+                  y: 0,
+                  z: 0
+                };
+                
+                for(var i = 0; i < 1000; i++){
+                    nodePositions[i] = new THREE.Vector3(0, 0, 0);
+                    forceOnNode[i] = new THREE.Vector3(0, 0, 0);
+                    springForceOnNode[i] = new THREE.Vector3(0, 0, 0);
+                    magneticForceOnNode[i] =  new THREE.Vector3(0, 0, 0);
+                    nodeDirection[i] = new THREE.Vector3(0, 0, 0);
+                    nodeSpeed[i] = new THREE.Vector3(0, 0, 0);
+                    neighbors[i] = [];
+                    continueCalculations[i] = true;
+                    prePosition[i] = new THREE.Vector3(0, 0, 0);
+                }
+              
+                planets = [];
+                planetRotation = 0;
+                //createEnvironment();
+                //rotatePlanets();
+                //camera.appendChild(teleport);
+                
+                window.addEventListener('keydown', checkKeyDown);  
+                window.addEventListener('wheel', zoom);  
+              
+                AFRAME.registerComponent('cursor-listener', {
+                  
+                  init: function () {
+                    var COLORS = ['red', 'green', 'blue'];
+                    this.el.addEventListener('click', function (event) {
+                        
+                      console.log('I was clicked at: ', event.detail.intersection.point);
+                      
+                      popUpImage.setAttribute('src', 'media/gsk-logo.jpg');
+                      popUpImage.setAttribute('height', 0.25);
+                      popUpImage.setAttribute('width', 0.5);
+                      popUpImage.setAttribute('opacity', 1.0);
+                      popUpImage.setAttribute('position', '' + (popUpPosition.x + 0.1) + ' ' + (popUpPosition.y + 0.3) + ' ' + (popUpPosition.z + 0.201) + '');
+                        
+                      popUpInfoPlane.setAttribute('height', 0.25);
+                      popUpInfoPlane.setAttribute('width', 1.5);
+                      popUpInfoPlane.setAttribute('opacity', 1.0);
+                      popUpInfoPlane.setAttribute('position', '' + (popUpPosition.x + 0.5) + ' ' + (popUpPosition.y + 0.3) + ' ' + (popUpPosition.z + 0.2) + '');
+                        
+                      popUpInfo.setAttribute('value', this.getAttribute('label'));
+                      popUpInfo.setAttribute('color', 'black');
+                      popUpInfo.setAttribute('height', '1');
+                      popUpInfo.setAttribute('width', '2');
+                      popUpInfo.setAttribute('opacity', 1.0);
+                      popUpInfo.setAttribute('position', '' + (popUpPosition.x + 0.5) + ' ' + (popUpPosition.y + 0.3) + ' ' + (popUpPosition.z + 0.21) + '')
+                      
+                      //camera.setAttribute('position', '' + (event.detail.intersection.point.x) + ' ' + (event.detail.intersection.point.y) + ' ' + (event.detail.intersection.point.z + 3) + '')
+                    
+                      camera = document.querySelector('#camera');
+                      
+                      teleport = document.createElement('a-animation');
+                      teleport.setAttribute('easing', 'ease-in');
+                      teleport.setAttribute('attribute', 'position');
+                      teleport.setAttribute('from', '' + camera.getAttribute('position').x + ' ' + camera.getAttribute('position').y + ' ' + camera.getAttribute('position').z + '');
+                      teleport.setAttribute('to', '' + (event.detail.intersection.point.x) + ' ' + (event.detail.intersection.point.y + 0.5) + ' ' + (event.detail.intersection.point.z + 3) + '');
+                      teleport.setAttribute('dur', '1500');
+                      camera.appendChild(teleport);
+                        console.dir( camera.getAttribute('position'));
+
+                        
+                      // set node isSelected here
+                      var nodeText = this.getAttribute('label');
+                      console.log(nodeText);
+                        entered = true;
+                        
+                    });
+                      
+                    this.el.addEventListener('mouseenter', function (event) {
+                    
+                      popUpPosition.x = event.detail.intersection.point.x;
+                      popUpPosition.y = event.detail.intersection.point.y;
+                      popUpPosition.z = event.detail.intersection.point.z;
+                      
+                      popUpImage.setAttribute('src', 'media/gsk-logo.jpg');
+                      popUpImage.setAttribute('height', 0.25);
+                      popUpImage.setAttribute('width', 0.5);
+                      popUpImage.setAttribute('opacity', 0.5);
+                      popUpImage.setAttribute('position', '' + (popUpPosition.x + 0.1) + ' ' + (popUpPosition.y + 0.3) + ' ' + (popUpPosition.z + 0.201) + '');
+                        
+                      popUpInfoPlane.setAttribute('height', 0.25);
+                      popUpInfoPlane.setAttribute('width', 1.5);
+                      popUpInfoPlane.setAttribute('rotation', '0 0 0');
+                      popUpInfoPlane.setAttribute('opacity', 0.5);
+                      popUpInfoPlane.setAttribute('position', '' + (popUpPosition.x + 0.5) + ' ' + (popUpPosition.y + 0.3) + ' ' + (popUpPosition.z + 0.2) + '');
+                        
+                      popUpInfo.setAttribute('value', this.getAttribute('label'));
+                      popUpInfo.setAttribute('color', 'black');
+                      popUpInfo.setAttribute('height', '1');
+                      popUpInfo.setAttribute('width', '2');
+                      popUpInfo.setAttribute('opacity', 0.5);
+                      popUpInfo.setAttribute('position', '' + (popUpPosition.x + 0.5) + ' ' + (popUpPosition.y + 0.3) + ' ' + (popUpPosition.z + 0.21) + '')
+                        
+                        entered = false;
+                      // set node isSelected here
+                    
+                    });
+                      
+                      
+                    this.el.addEventListener('mouseleave', function (event) {
+                        
+                        if(entered == false){
+                      
+                          popUpImage.setAttribute('opacity', 0.0);
+
+                          popUpInfoPlane.setAttribute('opacity', 0.0);
+
+                          popUpInfo.setAttribute('opacity', 0.0);
+
+                          // set node isSelected here
+                      }
+                      
+                    
+                    });
+                      
+                  }
+                });
+                
+                loadData();
+                //loadJSONGraph();
+            }
+            
+            
+          function zoom(event){
+            console.log(event);
+            rotations += ((event.wheelDelta / 500));
+            camera.setAttribute('position', '' + camera.getAttribute('position').x + ' ' + camera.getAttribute('position').y + ' ' + rotations + '')
+          }
+          function checkKeyDown(event){
+                var key = event.keyCode;
+                if(key == 69){ // 'e' key
+                    // move camera up
+                    rotations ++;
+                    document.querySelector("#structure").setAttribute('rotation', '0 ' + rotations + ' 0');
+                }
+                if(key == 81){ // 'e' key
+                    // move camera up
+                    cameraPosition[1] -= 0.1;
+                    document.querySelector("#camera").setAttribute('position', '' + cameraPosition[0] + ' ' + cameraPosition[1] + ' ' + cameraPosition[2] + '');
+                    console.dir(cameraPosition);
+                }
+            }
+          
+            var createNode = function(nd, ndSphr){
+                this.node = nd;
+                this.nodeSphere = ndSphr;
+            }
+            
+            var createEnvironment = function(){
+              
+              for(var i = 0; i < 250; i++){
+                var newSphere = document.createElement('a-sphere');
+                newSphere.setAttribute('radius', ((Math.random() * 1) + 1));
+                var theta = (Math.random() * 360);
+                var phi = (Math.random() * 90);
+                var negate = (Math.floor((Math.random() * 100) % 2));
+                if(negate == 1){
+                  phi *= -1;
+                }
+                
+                var xDist = Math.cos(theta) * Math.cos(phi) * environmentRadius;
+                var yDist = Math.cos(theta) * Math.sin(phi) * environmentRadius;
+                var zDist = Math.sin(theta) * environmentRadius;
+                
+                newSphere.setAttribute('position', '' + xDist + ' ' + yDist + ' ' + zDist + '');
+                
+            
+                aScene.appendChild(newSphere);
+              }
+              
+               for(var i = 0; i < 10; i++){
+                  var newSphere = document.createElement('a-sphere');
+                  newSphere.setAttribute('radius', ((Math.random() * 10) + 5));
+                  var theta = (Math.random() * 360);
+                  var phi = (Math.random() * 90);
+                  var negate = (Math.floor((Math.random() * 100) % 2));
+                  if(negate == 1){
+                    phi *= -1;
+                  }
+                  
+                  var xDist = Math.cos(theta) * Math.cos(phi) * (environmentRadius / (Math.random() * 2 + 1));
+                  var yDist = Math.cos(theta) * Math.sin(phi) * (environmentRadius / (Math.random() * 2 + 1));
+                  var zDist = Math.sin(theta) * (environmentRadius / (Math.random() * 2 + 1));
+                  var randomR = Math.floor(Math.random() * 255);
+                  var randomG = Math.floor(Math.random() * 255);
+                  var randomB = Math.floor(Math.random() * 255); 
+                  
+                  newSphere.setAttribute('rotation', '' + xDist + ' ' + yDist + ' ' + zDist + '');
+                  newSphere.setAttribute('position', '' + xDist + ' ' + yDist + ' ' + zDist + '');
+                  newSphere.setAttribute('material', {
+                            color: 'rgb(' + randomR + ',' + randomG + ',' + randomB +')',
+                            normalMap: 'media/normalMap.png'
+                            
+                        });
+
+                  document.querySelector('#planets').appendChild(newSphere);
+                  planets.push(newSphere);
+              }
+              
+              
+            }
+            
+            function rotatePlanets(){
+              requestAnimationFrame(rotatePlanets);
+              planetRotation += 0.01;
+              for(var i = 0; i < 10; i++){
+                document.querySelector('#planets').setAttribute('rotation', '0 ' + (planetRotation / 10) + ' 0')
+                planets[i].setAttribute('rotation', '0 ' + planetRotation + ' 0');
+              }
+            }
+            
+            function calcForce(){
+                requestAnimationFrame(calcForce);
+                // Constants
+                var springConstant = 8;
+                var coulombConstant = 8.99 * Math.pow(10,9);
+                
+                /*
+                // Set all nodes equi-distant
+                for(var i = 0; i < allNodes.length; i++){
+                    for (var j = 0; j < allNodes.length; j++){
+                        
+                        if(i != j && continueCalculations[i] == true){
+                            var distanceMag = nodePositions[i].distanceTo(nodePositions[j]);
+                            var distanceVec = new THREE.Vector3(0, 0, 0);
+                            
+                            //console.log(distanceMag);
+                            
+                            if(distanceMag > 1){
+                                
+                                distanceVec.subVectors(nodePositions[i], nodePositions[j]);
+                                distanceVec.normalize();
+                                
+                                forceOnNode[i].addVectors(forceOnNode[i], distanceVec);
+                            }
+                            else if(distanceMag < 1){
+                                forceOnNode[i] = new THREE.Vector3(0, 0, 0);
+                            }
+                            
+                            else {
+                                forceOnNode[i] = new THREE.Vector3(0, 0, 0);
+                                //continueCalculations[i] = false;
+                            }
+
+                        }
+                        
+                    }
+                }
+                
+                // Set all edges equi-length
+                for(var i = 0; i < allNodes.length; i++){
+                    for(var j = 0; j < neighbors[i].length; j++){
+                        
+                        var distanceMag = nodePositions[neighbors[i][j]].distanceTo(nodePositions[i]);
+                        var distanceVec = new THREE.Vector3(0, 0, 0);
+                        if(distanceMag > 1.5){
+                                
+                                distanceVec.subVectors(nodePositions[i], nodePositions[neighbors[i][j]]);
+                                distanceVec.normalize();
+                                
+                                distanceVec.multiplyScalar(1/distanceMag);
+                            
+                                forceOnNode[neighbors[i][j]].addVectors(forceOnNode[neighbors[i][j]], distanceVec);
+                            }
+                            else if(distanceMag < 2.5){
+                                
+                                distanceVec.subVectors(nodePositions[i], nodePositions[neighbors[i][j]]);
+                                distanceVec.normalize();
+                                
+                                distanceVec.multiplyScalar(1/distanceMag);
+                                
+                                forceOnNode[neighbors[i][j]].addVectors(forceOnNode[neighbors[i][j]], distanceVec.multiplyScalar(-1));
+                            }
+                            else if (distanceMag == 1){
+                                forceOnNode[neighbors[i][j]] = new Vector3(0, 0, 0);
+                            }
+                        
+                    }
+                }
+                */
+                
+                
+                
+                // Calculate spring force for neighbor nodes (attractive)
+                for(var i = 0; i < allNodes.length; i++){
+                    //var node1Pos = new THREE.Vector3(nodePositions[i][0], nodePositions[i][1], nodePositions[i][2]);
+                    
+                    for(var j = 0; j < neighbors[i].length; j++){
+                        
+
+                            //var node2Pos = new THREE.Vector3(nodePositions[j][0], nodePositions[j][1], nodePositions[j][2]);
+                            //console.dir(nodePositions[i]);
+                            //console.log(j);
+                            //console.dir(nodePositions);
+                            //console.dir(nodePositions[j]);
+                            var distanceMag = nodePositions[neighbors[i][j]].distanceTo(nodePositions[i]);
+                            
+                            //console.log(distanceMag);
+                            
+                            var distanceVec = new THREE.Vector3(0, 0, 0);
+                            distanceVec.subVectors(nodePositions[neighbors[i][j]], nodePositions[i]);
+                            
+                            distanceVec.normalize();
+
+                            var springForce = distanceVec.multiplyScalar(-springConstant * Math.log(distanceMag));
+                            
+                            //springForce.multiplyScalar(nodeSizes[i]);
+                            
+                            forceOnNode[neighbors[i][j]].addVectors(forceOnNode[neighbors[i][j]], springForce);
+                            //totalForce.addVectors(totalForce, forceOnNode[neighbors[i][j]]);
+                            springForceOnNode[neighbors[i][j]].addVectors(springForceOnNode[neighbors[i][j]], springForce);
+                        
+                    }
+                    
+                    // Calculate magnetic force for all nodes (repulsive)
+                    for(var j = 0; j < allNodes.length; j++){
+                        if(i != j){
+                            //var node2Pos = new THREE.Vector3(nodePositions[j][0], nodePositions[j][1], nodePositions[j][2]);
+                                    //console.dir(nodePositions);
+                                    var distanceMag = nodePositions[j].distanceTo(nodePositions[i]);
+
+                                    var distanceVec = new THREE.Vector3(0, 0, 0);
+                            
+                                    distanceVec.subVectors(nodePositions[j], nodePositions[i]);
+                            
+                                    distanceVec.normalize();
+
+                                    //var charge1 = nodeSizes[i] / 1000000;
+                                    //var charge2 = nodeSizes[j] / 1000000;
+
+                                    var magneticForce = distanceVec.multiplyScalar(coulombConstant * ((0.00005 * 0.00005) / (distanceMag * distanceMag)));
+
+                                    //magneticForce.multiplyScalar(nodeSizes[i] * 100);
+                                    
+                                    forceOnNode[j].addVectors(forceOnNode[j], magneticForce);
+                                    //totalForce.addVectors(totalForce, forceOnNode[j]);
+                                    magneticForceOnNode[j].addVectors(magneticForceOnNode[j], magneticForce);
+                                    
+                            
+                            
+                        }   
+                        
+                        
+                    }
+                    
+                    
+                    //console.log(magneticForceOnNode[i].equals(springForceOnNode[i]));
+                    //console.dir(magneticForceOnNode[i]);
+                    //console.dir(springForceOnNode[i]);
+                    //var subVec = magneticForceOnNode[i].add(springForceOnNode[i]);
+                    //console.dir(subVec);
+                    //forceOnNode[i].addVectors(forceOnNode[i], magneticForceOnNode[i]);
+                    //forceOnNode[i].addVectors(forceOnNode[i], springForceOnNode[i]);
+                    
+                }
+            
+                //console.log(forceOnNode[i] == 0);
+                
+                applyForce();
+            }
+            
+            function applyForce(){
+                //console.dir(forceOnNode);
+                for(var i = 0; i < allNodes.length; i++){
+                    
+                    /*
+                    var acceleration = new THREE.Vector3(0,0,0)
+                        acceleration = forceOnNode[i].divideScalar(100);
+                        //acceleration.addVectors(springForceOnNode[i], magneticForceOnNode[i])
+                        
+                        var newSpeed = new THREE.Vector3(0, 0, 0);
+                        newSpeed.addVectors(nodeSpeed[i], acceleration.divideScalar(10000));
+
+                        nodeSpeed[i] = newSpeed;
+                        
+                        //console.log(newSpeed);
+                        
+                        if(nodeSpeed < 0.001){
+                            console.log("slow");
+                        }
+                        */
+                    if(prePosition[i]){
+                        
+                        //prePosition.multiplyScalar(100);
+                        //forceOnNode.mult
+                        
+                        
+                    }
+                    
+                    //console.dir(totalForce);
+                    forceOnNode[i].normalize();
+                    forceOnNode[i].divideScalar(layoutSpeed); // make this small at first and then get larger
+                    //layoutSpeed += 0.1
+                    prePosition[i] = forceOnNode[i];
+                    
+                    nodePositions[i].addVectors(nodePositions[i],  forceOnNode[i]);
+                    
+                    /*
+                    if(forceOnNode[i].x < 0.005 && forceOnNode[i].x > -0.005 && forceOnNode[i].y < 0.005 && forceOnNode[i].y > -0.005 && forceOnNode[i].z < 0.005 && forceOnNode[i].z > -0.005 ){
+                        console.log("slow");
+                    }
+                    */
+                    
+                    
+                    
+                    //console.log(nodePositions[i].equals(prePosition[i]));
+                    
+                    //console.log(forceOnNode[i].x);
+                    
+                    
+                    /*
+                    debugLines[i].setAttribute('line', {
+                            start: '' + nodePositions[i].x + ' ' + nodePositions[i].y + ' ' + nodePositions[i].z + '',
+                            end: '' + (forceOnNode[i].x * 1000000) + ' ' + (forceOnNode[i].y * 1000000) + ' ' + (forceOnNode[i].z * 1000000) + '',
+                            color: 'red'
+                      
+                    })
+                    */
+                    
+                }
+                updatePosition();
+            }
+            
+            function updatePosition(){
+                for(var i = 0; i < allNodes.length; i++){
+                    allNodes[i].setAttribute('position', '' + nodePositions[i].x + ' ' + nodePositions[i].y + ' ' + nodePositions[i].z);
+                }
+                
+                for(var i = 0; i < allEdges.length; i++){
+                    allEdges[i].setAttribute('line', {
+                            start: '' + nodePositions[allEdges[i].getAttribute('source')].x + ' ' + nodePositions[allEdges[i].getAttribute('source')].y + ' ' + nodePositions[allEdges[i].getAttribute('source')].z + '',
+                            end: '' + nodePositions[allEdges[i].getAttribute('target')].x + ' ' + nodePositions[allEdges[i].getAttribute('target')].y + ' ' + nodePositions[allEdges[i].getAttribute('target')].z + '',
+                            color: '#FFF'
+                        });
+                }
+                
+            }
+            
+            function loadJSONGraph(){
+                //var obj = JSON.parse(customGraph);
+                //console.dir(customGraph);
+                var nodes = customGraph.nodes;
+                var edges = customGraph.edges;
+                
+                for(var i = 0; i < nodes.length; i++){
+                    var node = nodes[i];
+                    
+                    var nodeID = node.id;
+                    
+                    nodePositions[i] = new THREE.Vector3(Math.random(), Math.random(), Math.random());
+                    
+                    
+                    
+                    var nodeSphere = document.createElement('a-entity');
+                        nodeSphere.setAttribute('geometry', {
+                            primitive: 'sphere',
+                            radius: 0.15,
+                        });
+                    
+                    nodeSphere.setAttribute('position', {
+                            x: nodePositions[i].x,
+                            y: nodePositions[i].y,
+                            z: nodePositions[i].z
+                        })
+                    
+                     allNodes.push(nodeSphere);
+                     document.querySelector('#structure').appendChild(nodeSphere);
+                    
+                    
+                    var edgeLine = document.createElement('a-entity');
+                        
+                        edgeLine.setAttribute('line', {
+                            start: '' + nodePositions[i].x + ' ' + nodePositions[i].y + ' ' + nodePositions[i].z + '',
+                            end: '' + nodePositions[i].x + ' ' + (nodePositions[i].y + 1) + ' ' + nodePositions[i].z + '',
+                            color: '#red'
+                        });
+
+                    debugLines.push(edgeLine);
+                    document.querySelector('#structure').appendChild(edgeLine);
+                }
+                
+                for(var i = 0; i < edges.length; i++){
+                    var edge = edges[i];
+                    
+                    var edgeSource = edge.source;
+                    
+                    var edgeTarget = edge.target;
+                    
+                    var edgeLine = document.createElement('a-entity');
+                    
+                    var sourcePosition = nodePositions[Math.floor(edgeSource)];
+                    var targetPosition = nodePositions[Math.floor(edgeTarget)];
+                    
+                    
+                        
+                        neighbors[Math.floor(edgeSource)].push(Math.floor(edgeTarget));
+                        neighbors[Math.floor(edgeTarget)].push(Math.floor(edgeSource));
+                        
+                        edgeLine.setAttribute('source', Math.floor(edgeSource));
+                        edgeLine.setAttribute('target', Math.floor(edgeTarget));
+                        
+                        edgeLine.setAttribute('line', {
+                            start: '' + sourcePosition.x + ' ' + sourcePosition.y + ' ' + sourcePosition.z + '',
+                            end: '' + targetPosition.x + ' ' + targetPosition.y + ' ' + targetPosition.z + '',
+                            color: '#FFF'
+                        });
+
+                    allEdges.push(edgeLine);
+                    document.querySelector('#structure').appendChild(edgeLine);
+                    
+                }
+                
+                //console.dir(allNodes);
+                //console.dir(allEdges);
+                //console.dir(neighbors);
+                calcForce();
+            }
+          
+            // Load data from xml file
+            function loadData(){
+                var xhr = new XMLHttpRequest();
+
+                // Once XML Request has loaded
+                xhr.onload = function(){
+                    
+                    //var json = JSON.parse(xhr.responseText);
+                    //console.dir(json);
+                    // Store xml response in variable
+                    var xml = xhr.responseXML;
+
+                    // get nodes and edges from xml
+                    var nodes = xml.querySelectorAll('node');
+                    //console.dir(nodes);
+                    var edges = xml.querySelectorAll('edge');
+                    //console.dir(nodes);
+                 
+                    // Loop through all nodes
+                    // Get all node attributes
+                    // Create sphere for node's position and size
+                    // Create text for label
+                    for(var i = 0; i < nodes.length; i++){
+                        // get the current node
+                        var node = nodes[i];
+                        // get the current node's id
+                        var nodeID = node.getAttribute('id');
+                        // get the current node's label
+                        var nodeLabel = node.getAttribute('label');
+
+                        // get the current node's x position
+                        var nodePositionX = node.querySelector('position').getAttribute('x');
+                        if(!nodePositionX){
+                            nodePositionX = nodeID;
+                        }
+                        // get the current node's y position
+                        var nodePositionY = node.querySelector('position').getAttribute('y');
+                         if(!nodePositionY){
+                            nodePositionY = nodeID;
+                        }
+
+                        var xyDistance = Math.sqrt((nodePositionX * nodePositionX) + (nodePositionY * nodePositionY));
+                        xyDistance /= 550;
+                        var randMultiplyer = Math.floor((Math.random() * 100)) % 2;                       
+                        if(randMultiplyer == 0){
+                            randMultiplyer = -1;
+                        }
+                        else {
+                            randMultiplyer = 1;
+                        }
+                        var randomZ = (Math.random() * randMultiplyer * xyDistance) -5;
+                        
+                        // Set a random Z coordinate for the node (within a range of values)
+                        //var randomZ = Math.floor((Math.random() * -10) -5);
+
+                        //console.dir(nodePositionX);
+                        //console.dir(nodePositionY);
+                        //console.dir(randomZ);
+                        
+                        // Save the node's position
+                        //nodePositions[i] = new THREE.Vector3((nodePositionX / 100), (nodePositionY / 100), randomZ);
+                        nodePositions[i] = new THREE.Vector3(Math.random(), Math.random(), Math.random());
+                        
+                        
+                        //forceOnNode[i].addVectors(forceOnNode[i], magneticForce);
+                        
+                        // get the current node's size
+                        var nodeSize = node.querySelector('size').getAttribute('value');
+                        nodeSizes.push(nodeSize);
+                        if(!nodeSize){
+                            nodeSize = 0.1;
+                        }
+
+                        // get the current node's r color value
+                        var nodeColorR = node.querySelector('color').getAttribute('r');
+                         if(!nodeColorR){
+                             nodeColorR = 0;
+                         }
+                         // get the current node's g color value
+                        var nodeColorG = node.querySelector('color').getAttribute('g');
+                         if(!nodeColorG){
+                             nodeColorG = 0;
+                         }
+                         // get the current node's b color value
+                        var nodeColorB = node.querySelector('color').getAttribute('b');
+                         if(!nodeColorB){
+                             nodeColorB = 0;
+                         }
+                        
+                        // create sphere for node
+                        var nodeSphere = document.createElement('a-entity');
+                        nodeSphere.setAttribute('geometry', {
+                            primitive: 'sphere',
+                            radius: nodeSize / 100,
+                        });
+                        nodeSphere.setAttribute('position', {
+                            x: nodePositionX / 100,
+                            y: nodePositionY / 100,
+                            z: randomZ
+                        })
+                        nodeSphere.setAttribute('material', {
+                            color: 'rgb(' + nodeColorR + ',' + nodeColorG + ',' + nodeColorB +')',
+                            normalMap: 'media/normalMap2.png'
+                            
+                        });
+                        
+                        
+                        
+                        
+                        
+                        nodeSphere.setAttribute('cursor-listener', true);
+                        nodeSphere.setAttribute('label', nodeLabel);
+                        nodeSphere.setAttribute('nodeID', nodeID);
+                        nodeSphere.setAttribute('isSelected', false);
+                        nodeSphere.setAttribute('class', 'collidable')
+                        //aScene.appendChild(nodeSphere);
+                        allNodes.push(nodeSphere);
+                        document.querySelector('#structure').appendChild(nodeSphere);
+
+                    }
+
+                    // Loop through all edges
+                    // Get all edge attributes
+                    for(var i = 0; i < edges.length; i++){
+                        // get current edge
+                        var edge = edges[i];
+                        // get current edge's id
+                        var edgeID = edge.getAttribute('id');
+                        // get current edge's source
+                        var edgeSource = edge.getAttribute('source');
+                        // get current edge's target
+                        var edgeTarget = edge.getAttribute('target');
+
+                        var sourcePosition = nodePositions[Math.floor(edgeSource)];
+                        var targetPosition = nodePositions[Math.floor(edgeTarget)];
+                        
+                        neighbors[Math.floor(edgeSource)].push(Math.floor(edgeTarget));
+                        neighbors[Math.floor(edgeTarget)].push(Math.floor(edgeSource));
+                        
+                        
+                        
+                        
+                        var edgeLine = document.createElement('a-entity');
+                        
+                        edgeLine.setAttribute('source', Math.floor(edgeSource));
+                        edgeLine.setAttribute('target', Math.floor(edgeTarget));
+                        
+                        edgeLine.setAttribute('line', {
+                            start: '' + sourcePosition.x + ' ' + sourcePosition.y + ' ' + sourcePosition.z + '',
+                            end: '' + targetPosition.x + ' ' + targetPosition.y + ' ' + targetPosition.z + '',
+                            color: '#FFF'
+                        });
+                        //console.dir(edge);
+                        //edge.setAttribute('cursor-listener', false);
+                        edgeLine.setAttribute('class', "ignore-ray");
+                        //aScene.appendChild(edge);
+                        allEdges.push(edgeLine);
+                        document.querySelector('#structure').appendChild(edgeLine);
+                        
+
+                    }
+                    
+                    //console.dir(nodePositions);
+                    
+                    calcForce();
+                    //console.dir(neighbors);
+                    
+                    cursor.setAttribute('raycaster', {
+                        objects: '.collidable'
+                    });
+                    
+                }
+
+                // store the path to the data file
+                var path = "data/miserables.xml";
+
+                // open the xml request
+                xhr.open('GET', path, true);
+                // set request header
+                xhr.setRequestHeader("If-Modified-Since", "Sat, 1 Jan 2010 00:00:00 GMT");
+                // send the request
+                xhr.send();
+
+            }
+
+            // Load init when page has loaded
+            window.onload = init;
+            
+        }());
+
+    </script>
+    
+</head>
+
+<body>
+    
+    <a-scene id="scene" antialias="true">
+
+     <a-entity id="structure" position='0 0 -5'>
+      
+      </a-entity>
+        
+        <a-camera id='camera' fov='50' position="0 0 20"  wasd-controls='fly: true'>
+
+            <a-entity id="cursor" cursor="fuse: true"
+              raycaster="far: 20; interval: 1000"
+              scale='0.05 0.05 0.05'
+              position='0 0 -1.5'
+              geometry="primitive: ring"
+              class='ignore-ray'
+              material="color: white">
+              
+              <a-animation begin="click" easing="ease-in" attribute="scale"
+                     fill="backwards" from="0.01 0.01 0.01" to="0.05 0.05 0.05" dur="500"></a-animation>
+              
+            
+            <a-animation begin="cursor-fusing" easing="ease-in" attribute="material.color"
+                           fill="forwards" from="white" to="#00FF00" dur="1500"></a-animation>
+            
+            <a-animation begin="click" easing="ease-in" attribute="material.color"
+                           fill="forwards" from="#00FF00" to="white" dur="500"></a-animation>
+              
+            </a-entity>
+            
+        </a-camera>
+
+      <a-entity id="planets"></a-entity>
+      <!--
+      <a-image src='media/universe4.jpg' width="40" height='10' position='0 0 -25' repeat='4' side='right'></a-image>
+      <a-image src='media/universe4.jpg' width="40" height='10' position='-20 0 -5' rotation='0 90 0' repeat='4' side='right'></a-image>
+      <a-image src='media/universe4.jpg' width="40" height='10' position='20 0 -5' rotation='0 -90 0' repeat='4' side='right'></a-image>
+      <a-image src='media/universe4.jpg' width="40" height='10' position='0 0 15' rotation='0 180 0' repeat='4' side='right'></a-image>
+      <a-image src='media/universe4.jpg' width="40" height='10' position='0 5 0' rotation='90 0 0' repeat='4' side='right'></a-image>
+      <a-image src='media/universe4.jpg' width="40" height='10' position='0 -5 0' rotation='-90 0 0' repeat='4' side='right'></a-image>
+      <a-image src='media/universe4.jpg' width="40" height='10' position='0 5 -20' rotation='90 0 0' repeat='4' side='right'></a-image>
+      <a-image src='media/universe4.jpg' width="40" height='10' position='0 -5 10' rotation='-90 0 0' repeat='4' side='right'></a-image>
+      <a-image src='media/universe4.jpg' width="40" height='10' position='0 5 -10' rotation='90 0 0' repeat='4' side='right'></a-image>
+      <a-image src='media/universe4.jpg' width="40" height='10' position='0 -5 -10' rotation='-90 0 0' repeat='4' side='right'></a-image>
+      <a-image src='media/universe4.jpg' width="40" height='10' position='0 5 10' rotation='90 0 0' repeat='4' side='right'></a-image>
+      <a-image src='media/universe4.jpg' width="40" height='10' position='0 -5 -20' rotation='-90 0 0' repeat='4' side='right'></a-image>
+
+      <a-sky color="#ECECEC" class='ignore-ray' cursor-listener='false'></a-sky>
+      <a-plane color="#CEC" height='500' width='500' position='0 -15 0' rotation="-90 0 0" class='ignore-ray' cursor-listener='false'></a-plane>
+      <a-sphere color="#99D" radius="50" scale='-1 1 1' position='0 -15 0' wireframe="true" class='ignore-ray' cursor-listener='false'></a-sphere>
+      -->
+      <a-sky color="black" class='ignore-ray' cursor-listener='false'></a-sky>
+
+      
+    </a-scene>
+    
+</body>
+
+</html>
