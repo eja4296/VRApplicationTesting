@@ -51,6 +51,8 @@
             var neighbors;
             var previousNeighbors;
             var nodeMoveAnimation;
+            var orbitRotationIncrement;
+            var orbitRotationBool;
 
 
             // Starter function
@@ -63,6 +65,8 @@
                 neighbors = [];
                 nodeOrbit = [];
                 orbitRotation = 0;
+                orbitRotationIncrement = 0.05;
+                orbitRotationBool = false;
                 for(var i = 0; i < 1000; i++){
                     neighbors[i] = [];
                     nodeOrbit[i] = 0;
@@ -99,7 +103,7 @@
                     normalMap: 'media/normalMap2.png'
                 });
 
-                createEnvironment();
+                //createEnvironment();
                 //rotatePlanets();
                 //camera.appendChild(teleport);
                 
@@ -280,6 +284,17 @@
                     document.querySelector("#camera").setAttribute('position', '' + cameraPosition[0] + ' ' + cameraPosition[1] + ' ' + cameraPosition[2] + '');
                     console.dir(cameraPosition);
                 }
+              if(key == 32){ // 'e' key
+                    if(orbitRotationBool == false){
+                        orbitRotationIncrement = 0.01;
+                        orbitRotationBool = true;
+                    }
+                    else{
+                        orbitRotationIncrement = 0.05;
+                        orbitRotationBool = false;
+                    }
+                    
+                }
             }
           
             var createNode = function(nd, ndSphr){
@@ -352,24 +367,24 @@
             
             function rotateOrbits(){
                 requestAnimationFrame(rotateOrbits);
-                orbitRotation += 0.01;
+                orbitRotation += orbitRotationIncrement;
                 //document.querySelector('#sun').setAttribute('rotation', '0 ' + orbitRotation + ' 0');
                 for(var i = 1; i <= 5; i++){
                     var orbitLevel = document.querySelector('#level' + i);
                     if(i == 1){
-                        orbitLevel.setAttribute('rotation', '' + orbitRotation + ' ' + orbitRotation + ' 0');
+                        orbitLevel.setAttribute('rotation', '' + (orbitRotation * 4) + ' 0 0');
                     }
                     else if(i == 2){
-                        orbitLevel.setAttribute('rotation', '' + orbitRotation + ' 0 ' + orbitRotation + '');
+                        orbitLevel.setAttribute('rotation', '0 0 ' + (orbitRotation * 2) + '');
                     }
                     else if(i == 3){
-                        orbitLevel.setAttribute('rotation', '0 ' + orbitRotation + ' ' + orbitRotation + '');
+                        orbitLevel.setAttribute('rotation', '' + (orbitRotation * 2) + ' 0 0');
                     }
                     else if(i == 4){
-                        orbitLevel.setAttribute('rotation', '' + (-orbitRotation) + ' ' + orbitRotation + ' 0');
+                        orbitLevel.setAttribute('rotation', '0 0 ' + orbitRotation + '');
                     }
                     else{
-                        orbitLevel.setAttribute('rotation', '' + (orbitRotation) + ' 0 ' + (-orbitRotation) + '');
+                        orbitLevel.setAttribute('rotation', '' + orbitRotation + ' 0 0');
                     }
                    
                     
@@ -605,7 +620,7 @@
 
 <body>
     
-    <a-scene id="scene" sssssantialias="true">
+    <a-scene id="scene" antialias="true">
 
      <a-entity id="structure" position='0 0 0'>
          
@@ -658,7 +673,7 @@
       
       </a-entity>
         
-        <a-camera id='camera' fov='50' position="0 15 15" wasd-controls='fly: true'>
+        <a-camera id='camera' fov='50' position="0 15 50" wasd-controls='fly: true'>
 
             <a-entity id="cursor" cursor="fuse: true"
               raycaster="far: 20; interval: 1000"

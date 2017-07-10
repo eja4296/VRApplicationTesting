@@ -12,12 +12,7 @@
     <!-- import aFrame Library -->
     <script src="https://aframe.io/releases/0.5.0/aframe.min.js"></script>
     <script src="js/aframe-line-component.min.js"></script>
-    <script src="js/aframe-crawling-cursor.min.js"></script>
-    <script src="js/aframe-selectable-component.min.js"></script>
-    <script src="js/aframe-tooltip-component.min.js"></script>
-    <script src="js/aframe-forcegraph-component.min.js"></script>
-    <script src="js/d3.min.js"></script>
-    
+
     <!-- Main Script -->
     <script>
 
@@ -134,6 +129,7 @@
                   
                   init: function () {
                     var COLORS = ['red', 'green', 'blue'];
+                    // Cursor Click
                     this.el.addEventListener('click', function (event) {
                         
                       console.log('I was clicked at: ', event.detail.intersection.point);
@@ -171,7 +167,8 @@
                       var nodeText = this.getAttribute('label');
                         entered = true;
                         });
-                      
+                    
+                    // Cursor Hover
                     this.el.addEventListener('mouseenter', function (event) {
                     
                       popUpPosition.x = event.detail.intersection.point.x;
@@ -201,7 +198,7 @@
                     
                     });
                       
-                      
+                    // Cursor Leave
                     this.el.addEventListener('mouseleave', function (event) {
                         
                         if(entered == false){
@@ -312,6 +309,7 @@
             }
             */
             
+            // Main update loop
             function update(){
                 requestAnimationFrame(update);
                 
@@ -321,10 +319,8 @@
                 
             }
             
+            // Calculate the forces acting on the nodes
             function calcForce(){
-                //window.requestAnimationFrame(calcForce);
-                
-                
                 // Calculate spring force for neighbor nodes (attractive)
                 for(var i = 0; i < allNodes.length; i++){
                     
@@ -356,9 +352,9 @@
                             distanceVec.subVectors(nodePositions[j], nodePositions[i]);
 
                             distanceVec.normalize();
-
+                            
                             var magneticForce = distanceVec.multiplyScalar(-coulombConstant * ((nodeCharge * nodeCharge) / (distanceMag * distanceMag)));
-
+                            
                             forceOnNode[i].addVectors(forceOnNode[i], magneticForce);  
                             
                         }   
@@ -371,6 +367,7 @@
                 applyForce();
             }
             
+            // Apply the calculated forces to the nodes
             function applyForce(){
 
                 for(var i = 0; i < allNodes.length; i++){
@@ -412,9 +409,9 @@
                 
                 meanForceIndexTracker += 1;
                 
-                console.log("mean: " + average);
+                //console.log("mean: " + average);
                 
-                console.log("displacement: " + displacement);
+                //console.log("displacement: " + displacement);
                 //minForce = displacement;
                 //maxForce = displacement;
                 if(displacement > maxForce){
@@ -424,40 +421,48 @@
                 if(displacement < minForce){
                     minForce = displacement;
                 }
-                console.log(maxForce);
-                console.log(minForce);
+                //console.log(maxForce);
+                //console.log(minForce);
                 percentForce = ((maxForce - average) / maxForce) * 100;
                 
-                if(percentForce > 99.5){
+                if(percentForce > 99.7){
                     calculating = false;
                 }
                 
                 /*
-                if(percentForce > 96){
+                if(percentForce > 96 && percentForce < 97){
                     layoutSpeed = 10;
                 }
-                else if(percentForce > 97){
+                else if(percentForce > 97 && percentForce < 98){
                     layoutSpeed = 25;
                 }
-                else if(percentForce > 98){
+                else if(percentForce > 98 && percentForce < 99){
                     layoutSpeed = 50;
                 }
                 */
-                else if(layoutSpeed > 99){
-                    layoutSpeed = 50;
+                if(percentForce > 99){
+                    layoutSpeed = 10;
                 }
                 
                 
-                console.log(percentForce + "%")
+                //console.log(percentForce + "%")
                 
                 displacement = 0;
                 //updatePosition();
                 
-                //if(calculating == false){
+                if(calculating == false){
+                    var structure = document.querySelector('#structure');
+                    for(var i = 0; i < allNodes.length; i++){
+                        structure.appendChild(allNodes[i]);
+                    }
+                    for(var i = 0; i < allEdges.length; i++){
+                        structure.appendChild(allEdges[i]);
+                    }
                     updatePosition();
-               // }
+               }
             }
             
+            // Update the nodes and edges positions based on the applied forces
             function updatePosition(){
                 for(var i = 0; i < allNodes.length; i++){
                     allNodes[i].setAttribute('position', '' + nodePositions[i].x + ' ' + nodePositions[i].y + ' ' + nodePositions[i].z);
@@ -484,9 +489,7 @@
                     var nodeID = node.id;
                     
                     nodePositions[i] = new THREE.Vector3(Math.random(), Math.random(), Math.random());
-                    
-                    
-                    
+
                     var nodeSphere = document.createElement('a-entity');
                         nodeSphere.setAttribute('geometry', {
                             primitive: 'sphere',
@@ -610,6 +613,8 @@
                         
                         // get the current node's size
                         var nodeSize = node.querySelector('size').getAttribute('value');
+                        
+                       
 
                         if(!nodeSize){
                             nodeSize = 0.1;
@@ -635,7 +640,7 @@
                         var nodeSphere = document.createElement('a-entity');
                         nodeSphere.setAttribute('geometry', {
                             primitive: 'sphere',
-                            radius: nodeSize / 100,
+                            radius: nodeSize / 80,
                         });
                         nodeSphere.setAttribute('position', {
                             x: nodePositionX / 100,
@@ -644,9 +649,10 @@
                         })
                         nodeSphere.setAttribute('material', {
                             color: 'rgb(' + nodeColorR + ',' + nodeColorG + ',' + nodeColorB +')',
-                            normalMap: 'media/normalMap2.png'
+                            //normalMap: 'media/normalMap2.png'
                             
                         });
+                        nodeSphere.setAttribute('size', nodeSize);
                         
                         nodeSphere.setAttribute('cursor-listener', true);
                         nodeSphere.setAttribute('label', nodeLabel);
@@ -654,7 +660,7 @@
                         nodeSphere.setAttribute('isSelected', false);
                         nodeSphere.setAttribute('class', 'collidable')
                         allNodes.push(nodeSphere);
-                        document.querySelector('#structure').appendChild(nodeSphere);
+                        //document.querySelector('#structure').appendChild(nodeSphere);
 
                     }
                     
@@ -689,13 +695,14 @@
                         edgeLine.setAttribute('line', {
                             start: '' + sourcePosition.x + ' ' + sourcePosition.y + ' ' + sourcePosition.z + '',
                             end: '' + targetPosition.x + ' ' + targetPosition.y + ' ' + targetPosition.z + '',
-                            color: '#FFF'
+                            color: '#FFF',
+                            opacity: '0.5'
                         });
                         
                         edgeLine.setAttribute('cursor-listener', false);
                         edgeLine.setAttribute('class', "ignore-ray");
                         allEdges.push(edgeLine);
-                        document.querySelector('#structure').appendChild(edgeLine);
+                        //document.querySelector('#structure').appendChild(edgeLine);
 
                     }
 
@@ -731,13 +738,13 @@
 
 <body>
     
-    <a-scene id="scene" antialias="true">
+    <a-scene id="scene" stats antialias="true">
 
      <a-entity id="structure" position='0 0 -5'>
       
       </a-entity>
         
-        <a-camera id='camera' fov='50' position="0 0 50"  wasd-controls='fly: true'>
+        <a-camera id='camera' fov='50' position="0 0 100"  wasd-controls='fly: true'>
 
             <a-entity id="cursor" cursor="fuse: true"
               raycaster="far: 20; interval: 1000"
