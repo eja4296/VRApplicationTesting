@@ -34,13 +34,17 @@
             var zDistance = sphere2.getAttribute("position").z - sphere1.getAttribute("position").z;
             
             var totalDistance = Math.sqrt((xDistance * xDistance) + (yDistance * yDistance) + (zDistance * zDistance));
-                    
+            
+            /*
             var zRot = Math.atan(yDistance / xDistance);
             var xRot = Math.atan(yDistance / zDistance);
             var yRot = Math.atan(zDistance / xDistance);
-        
+        */
             
-                    
+            var zRot = 0;
+            var xRot = 0;
+            var yRot = 0;
+            
             zRot *= (180 / Math.PI);
             yRot *= (180 / Math.PI);
             xRot *= (180 / Math.PI);
@@ -53,7 +57,7 @@
             
             
             cylinder1.setAttribute('height', totalDistance);
-            cylinder1.setAttribute('rotation', '' + (xRot - 0) + ' ' + (yRot - 0) + ' ' + (zRot) + '');
+            //cylinder1.setAttribute('rotation', '' + (xRot - 0) + ' ' + (yRot - 0) + ' ' + (zRot) + '');
             
             var halfwayX = (sphere1.getAttribute("position").x + sphere2.getAttribute("position").x) / 2;
             var halfwayY = (sphere1.getAttribute("position").y + sphere2.getAttribute("position").y) / 2;
@@ -74,6 +78,9 @@
                          zRot += 1;
                      }
                     cylinder1.setAttribute("rotation", '' + (xRot - 0) + ' ' + (yRot - 0) + ' ' + (zRot) + '');
+                console.log('x: ' + xRot);
+                console.log('y: ' + yRot);
+                console.log('z: ' + zRot);
             });
                 
             
@@ -92,9 +99,9 @@
       <a-camera position = "0 0 10">
         <a-cursor></a-cursor>
       </a-camera>
-        <a-cylinder id="cyl" position="0 0 0" radius="0.25" height="10" color="red"></a-cylinder>
-        <a-sphere id="sph1" position="5 -3 7" radius="0.5" color="blue"></a-sphere>
-        <a-sphere id="sph2" position="-2 8 -4" radius="0.5" color="blue"></a-sphere>
+        <a-cylinder id="cyl" position="0.5 0.5 0.5" radius="0.25" height="10" rotation='0 0 0' color="red"></a-cylinder>
+        <a-sphere id="sph1" position="1 1 1" radius="0.5" color="blue"></a-sphere>
+        <a-sphere id="sph2" position="0 0 0" radius="0.5" color="blue"></a-sphere>
         <a-cylinder position="0 0 0" radius=".1" height="10" color="black" rotation="90 0 0"></a-cylinder>
         <a-cylinder position="0 0 0" radius="0.1" height="10" color="black" rotation="0 0 0"></a-cylinder>
         <a-cylinder position="0 0 0" radius=".1" height="10" color="black" rotation="0 0 90"></a-cylinder>

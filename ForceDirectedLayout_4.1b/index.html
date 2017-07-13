@@ -1,0 +1,1010 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8"/>
+    <title>VR Graph/Network Data Visualization Application Prototype</title>
+    
+    <style>
+        
+    </style>
+    
+    <!-- import aFrame Library -->
+    <script src="https://aframe.io/releases/0.5.0/aframe.min.js"></script>
+    <script src="js/aframe-line-component.min.js"></script>
+
+    <!-- Main Script -->
+    <script>
+
+        // IIFE
+        (function(){
+            'use strict';
+            
+            // variables
+            var aScene;
+            var camera;
+            var cursor;
+            var entered;
+            var popUpInfo;
+            var popUpInfoPlane;
+            var popUpImage;
+            var popUpPosition;
+            
+            var allNodes;
+            var allEdges;
+            var nodePositions;
+            var neighborList;
+            var forceOnNode;
+            
+            // Force Constants
+            const springConstant = 8;
+            const coulombConstant = 8.99 * Math.pow(10,9);
+            const nodeCharge = 0.000025;
+            const springEquilibrium = 1;
+
+            var customGraph = {
+                "nodes": [
+                    {"id":"0","group":1},
+                    {"id":"1","group":1},
+                    {"id":"2","group":1},
+                    {"id":"3","group":1},
+                    {"id":"4","group":1},
+
+                ],
+                "edges":[
+                    {"source": "0", "target": "1"},
+                    {"source": "0", "target": "2"},
+                    {"source": "0", "target": "3"},
+                    {"source": "1", "target": "2"},
+                    {"source": "3", "target": "4"},
+                ]
+            };
+            
+            // Environment variables
+            var environmentRadius;
+            var planets;
+            var planetRotation;
+            
+            // Extra variables; may not need later
+            var rotations = 0;
+            var continueCalculations = [];
+            var debugLines = [];
+            var layoutSpeed = 1;
+            var prevPosition = [];
+            
+            var displacement = 0;
+            var maxForce = 0;
+            var minForce = 0;
+            
+            var meanForce = 0;
+            var meanForceIndexTracker = 1;
+            var percentForce = 0;
+            var calculating = true;
+            
+            var start;
+            var elapsed;
+            var steps = 0;
+            var stepTime = 0;
+            var averageStepTime = 0;
+            
+            var startPositions = [];
+            var edgeTimer = 0;
+            var loadingPlane;
+            var loadingPlaneRotation = 0;
+
+            // Starter function
+            function init(){
+                // get aframe scene element
+                aScene = document.querySelector("#scene");
+                
+                // Node and Edge information holders
+                allNodes = [];
+                allEdges = [];
+                nodePositions = [];
+                neighborList = [];
+                forceOnNode = [];
+                
+                environmentRadius = 500;
+                
+                // test image
+                popUpInfo = document.createElement('a-text');
+                popUpInfoPlane = document.createElement('a-plane');
+                popUpImage = document.createElement('a-image');
+                popUpImage.setAttribute('opacity', 0.0);
+                popUpInfoPlane.setAttribute('opacity', 0.0);
+                popUpInfo.setAttribute('opacity', 0.0);
+                aScene.appendChild(popUpInfo);
+                aScene.appendChild(popUpInfoPlane);
+                aScene.appendChild(popUpImage);
+                camera = document.querySelector('#camera');
+                entered = false;
+                cursor = document.querySelector("#cursor");
+                popUpPosition = {
+                  x: 0,
+                  y: 0,
+                  z: 0
+                };
+                
+                loadingPlane = document.createElement('a-plane');
+                loadingPlane.setAttribute('position', '0.05 0 -1.49');
+                loadingPlane.setAttribute('height', 0.02);
+                loadingPlane.setAttribute('width', 0.02);
+                loadingPlane.setAttribute('color', '#00FF00');
+
+                document.querySelector("#loadingPlane").appendChild(loadingPlane);
+                // For "Space" Environment
+                //createEnvironment();
+                //rotatePlanets();
+                //planets = [];
+                
+                
+                
+                
+                // For Event Listeners
+                //window.addEventListener('keydown', checkKeyDown);  
+                //window.addEventListener('wheel', zoom);  
+                //planetRotation = 0;
+                
+                // Cursor Listeners, Click, Enter
+                AFRAME.registerComponent('cursor-listener', {
+                  
+                  init: function () {
+                    var COLORS = ['red', 'green', 'blue'];
+                    // Cursor Click
+                    this.el.addEventListener('click', function (event) {
+                        
+                      console.log('I was clicked at: ', event.detail.intersection.point);
+                      
+                      popUpImage.setAttribute('src', 'media/gsk-logo.jpg');
+                      popUpImage.setAttribute('height', 0.25);
+                      popUpImage.setAttribute('width', 0.5);
+                      popUpImage.setAttribute('opacity', 1.0);
+                      popUpImage.setAttribute('position', '' + (popUpPosition.x + 0.1) + ' ' + (popUpPosition.y + 0.3) + ' ' + (popUpPosition.z + 0.201) + '');
+                        
+                      popUpInfoPlane.setAttribute('height', 0.25);
+                      popUpInfoPlane.setAttribute('width', 1.5);
+                      popUpInfoPlane.setAttribute('opacity', 1.0);
+                      popUpInfoPlane.setAttribute('position', '' + (popUpPosition.x + 0.5) + ' ' + (popUpPosition.y + 0.3) + ' ' + (popUpPosition.z + 0.2) + '');
+                        
+                      popUpInfo.setAttribute('value', this.getAttribute('label'));
+                      popUpInfo.setAttribute('color', 'black');
+                      popUpInfo.setAttribute('height', '1');
+                      popUpInfo.setAttribute('width', '2');
+                      popUpInfo.setAttribute('opacity', 1.0);
+                      popUpInfo.setAttribute('position', '' + (popUpPosition.x + 0.5) + ' ' + (popUpPosition.y + 0.3) + ' ' + (popUpPosition.z + 0.21) + '')
+                    
+                      camera = document.querySelector('#camera');
+                      
+                      var teleport = document.createElement('a-animation');
+                      teleport.setAttribute('easing', 'ease-in');
+                      teleport.setAttribute('attribute', 'position');
+                      teleport.setAttribute('from', '' + camera.getAttribute('position').x + ' ' + camera.getAttribute('position').y + ' ' + camera.getAttribute('position').z + '');
+                      teleport.setAttribute('to', '' + (event.detail.intersection.point.x) + ' ' + (event.detail.intersection.point.y + 0.5) + ' ' + (event.detail.intersection.point.z + 3) + '');
+                      teleport.setAttribute('dur', '1500');
+                      camera.appendChild(teleport);
+
+                        
+                      // set node isSelected here
+                      var nodeText = this.getAttribute('label');
+                        entered = true;
+                        });
+                    
+                    // Cursor Hover
+                    this.el.addEventListener('mouseenter', function (event) {
+                    
+                      popUpPosition.x = event.detail.intersection.point.x;
+                      popUpPosition.y = event.detail.intersection.point.y;
+                      popUpPosition.z = event.detail.intersection.point.z;
+                      
+                      popUpImage.setAttribute('src', 'media/gsk-logo.jpg');
+                      popUpImage.setAttribute('height', 0.25);
+                      popUpImage.setAttribute('width', 0.5);
+                      popUpImage.setAttribute('opacity', 0.5);
+                      popUpImage.setAttribute('position', '' + (popUpPosition.x + 0.1) + ' ' + (popUpPosition.y + 0.3) + ' ' + (popUpPosition.z + 0.201) + '');
+                        
+                      popUpInfoPlane.setAttribute('height', 0.25);
+                      popUpInfoPlane.setAttribute('width', 1.5);
+                      popUpInfoPlane.setAttribute('rotation', '0 0 0');
+                      popUpInfoPlane.setAttribute('opacity', 0.5);
+                      popUpInfoPlane.setAttribute('position', '' + (popUpPosition.x + 0.5) + ' ' + (popUpPosition.y + 0.3) + ' ' + (popUpPosition.z + 0.2) + '');
+                        
+                      popUpInfo.setAttribute('value', this.getAttribute('label'));
+                      popUpInfo.setAttribute('color', 'black');
+                      popUpInfo.setAttribute('height', '1');
+                      popUpInfo.setAttribute('width', '2');
+                      popUpInfo.setAttribute('opacity', 0.5);
+                      popUpInfo.setAttribute('position', '' + (popUpPosition.x + 0.5) + ' ' + (popUpPosition.y + 0.3) + ' ' + (popUpPosition.z + 0.21) + '')
+                        
+                      entered = false;
+                    
+                    });
+                      
+                    // Cursor Leave
+                    this.el.addEventListener('mouseleave', function (event) {
+                        
+                        if(entered == false){
+                          popUpImage.setAttribute('opacity', 0.0);
+                          popUpInfoPlane.setAttribute('opacity', 0.0);
+                          popUpInfo.setAttribute('opacity', 0.0);
+                      }
+                      
+                    });
+                      
+                  }
+                });
+                
+                loadData();
+                //loadJSONGraph();
+            }
+            
+        /*
+          function zoom(event){
+                console.log(event);
+                rotations += ((event.wheelDelta / 500));
+                camera.setAttribute('position', '' + camera.getAttribute('position').x + ' ' + camera.getAttribute('position').y + ' ' + rotations + '');
+          }
+            
+          function checkKeyDown(event){
+                var key = event.keyCode;
+                if(key == 69){ // 'e' key
+                    // move camera up
+                    rotations ++;
+                    document.querySelector("#structure").setAttribute('rotation', '0 ' + rotations + ' 0');
+                }
+                if(key == 81){ // 'e' key
+                    // move camera up
+                    cameraPosition[1] -= 0.1;
+                    document.querySelector("#camera").setAttribute('position', '' + cameraPosition[0] + ' ' + cameraPosition[1] + ' ' + cameraPosition[2] + '');
+                    console.dir(cameraPosition);
+                }
+            }
+          
+            var createNode = function(nd, ndSphr){
+                this.node = nd;
+                this.nodeSphere = ndSphr;
+            }
+            */
+            
+            
+            /*
+            var createEnvironment = function(){
+              
+              for(var i = 0; i < 250; i++){
+                var newSphere = document.createElement('a-sphere');
+                newSphere.setAttribute('radius', ((Math.random() * 1) + 1));
+                var theta = (Math.random() * 360);
+                var phi = (Math.random() * 90);
+                var negate = (Math.floor((Math.random() * 100) % 2));
+                if(negate == 1){
+                  phi *= -1;
+                }
+                
+                var xDist = Math.cos(theta) * Math.cos(phi) * environmentRadius;
+                var yDist = Math.cos(theta) * Math.sin(phi) * environmentRadius;
+                var zDist = Math.sin(theta) * environmentRadius;
+                
+                newSphere.setAttribute('position', '' + xDist + ' ' + yDist + ' ' + zDist + '');
+                
+                aScene.appendChild(newSphere);
+              }
+              
+               for(var i = 0; i < 10; i++){
+                  var newSphere = document.createElement('a-sphere');
+                  newSphere.setAttribute('radius', ((Math.random() * 10) + 5));
+                  var theta = (Math.random() * 360);
+                  var phi = (Math.random() * 90);
+                  var negate = (Math.floor((Math.random() * 100) % 2));
+                  if(negate == 1){
+                    phi *= -1;
+                  }
+                  
+                  var xDist = Math.cos(theta) * Math.cos(phi) * (environmentRadius / (Math.random() * 2 + 1));
+                  var yDist = Math.cos(theta) * Math.sin(phi) * (environmentRadius / (Math.random() * 2 + 1));
+                  var zDist = Math.sin(theta) * (environmentRadius / (Math.random() * 2 + 1));
+                  var randomR = Math.floor(Math.random() * 255);
+                  var randomG = Math.floor(Math.random() * 255);
+                  var randomB = Math.floor(Math.random() * 255); 
+                  
+                  newSphere.setAttribute('rotation', '' + xDist + ' ' + yDist + ' ' + zDist + '');
+                  newSphere.setAttribute('position', '' + xDist + ' ' + yDist + ' ' + zDist + '');
+                  newSphere.setAttribute('material', {
+                            color: 'rgb(' + randomR + ',' + randomG + ',' + randomB +')',
+                            normalMap: 'media/normalMap.png'
+                            
+                        });
+
+                  document.querySelector('#planets').appendChild(newSphere);
+                  planets.push(newSphere);
+              }
+              
+              
+            }
+            
+            function rotatePlanets(){
+              requestAnimationFrame(rotatePlanets);
+              planetRotation += 0.01;
+              for(var i = 0; i < 10; i++){
+                document.querySelector('#planets').setAttribute('rotation', '0 ' + (planetRotation / 10) + ' 0')
+                planets[i].setAttribute('rotation', '0 ' + planetRotation + ' 0');
+              }
+            }
+            */
+            
+            // Main update loop
+            function update(){
+                requestAnimationFrame(update);
+                
+                if(calculating == true){
+                    calcForce();
+                    loading();
+                }
+                else{
+                    edgeTimer += 1;
+                    loadingPlane.setAttribute('opacity', '0')
+                }
+                if(edgeTimer == 150){
+                    updatePosition();
+                    //updateEdgeAnimation();
+                }
+                
+            }
+            
+            // Calculate the forces acting on the nodes
+            function calcForce(){
+                start = new Date();
+                
+                
+                for(var i = 0; i < allEdges.length; i++){
+                    
+                    
+                    var sourceNode = allEdges[i].getAttribute('source');
+                    var targetNode = allEdges[i].getAttribute('target');
+                    var edgeWeight = allEdges[i].getAttribute('weight');
+                    
+                    
+                    var distanceMag = nodePositions[sourceNode].distanceTo(nodePositions[targetNode]);
+                            
+                    //distanceMag -= springEquilibrium;
+
+                    var distanceVec = new THREE.Vector3(0, 0, 0);
+
+                    distanceVec.subVectors(nodePositions[targetNode], nodePositions[sourceNode]);
+
+                    distanceVec.normalize();
+
+                    var springForce = distanceVec.multiplyScalar(springConstant * (Math.log(distanceMag) / 2));
+                    var springForce = distanceVec.multiplyScalar(springConstant * (Math.log(distanceMag) / 2));
+
+                    forceOnNode[sourceNode].addVectors(forceOnNode[sourceNode], springForce);
+                    
+                    springForce.multiplyScalar(-1);
+                    
+                    forceOnNode[targetNode].addVectors(forceOnNode[targetNode], springForce);
+                    
+                }
+                
+                // Calculate spring force for neighbor nodes (attractive)
+                
+                for(var i = 0; i < allNodes.length; i++){
+                    
+                    //forceOnNode[i] = new THREE.Vector3(0, 0, 0);
+                    
+                    
+                    /*
+                    for(var j = 0; j < neighborList[i].length; j++){
+                            
+                            var distanceMag = nodePositions[neighborList[i][j]].distanceTo(nodePositions[i]);
+                            
+                            distanceMag -= springEquilibrium;
+                        
+                            var distanceVec = new THREE.Vector3(0, 0, 0);
+                        
+                            distanceVec.subVectors(nodePositions[neighborList[i][j]], nodePositions[i]);
+
+                            distanceVec.normalize();
+
+                            var springForce = distanceVec.multiplyScalar(springConstant * ((distanceMag)));
+
+                            forceOnNode[i].addVectors(forceOnNode[i], springForce);
+                        
+                            
+
+                    }
+                    */
+                    
+                    // Calculate magnetic force for all nodes (repulsive)
+                    for(var j = 0; j < allNodes.length; j++){
+                        if(i != j){
+                            var distanceMag = nodePositions[j].distanceTo(nodePositions[i]);
+                            
+                            if(distanceMag < 50){
+                                var distanceVec = new THREE.Vector3(0, 0, 0);
+                            
+                                distanceVec.subVectors(nodePositions[j], nodePositions[i]);
+
+                                distanceVec.normalize();
+
+                                var magneticForce = distanceVec.multiplyScalar(-coulombConstant * ((nodeCharge * nodeCharge) / (distanceMag * distanceMag)));
+
+                                forceOnNode[i].addVectors(forceOnNode[i], magneticForce);  
+                           }
+                            
+                            
+                            
+                        }   
+                        
+                        
+                    }
+                    
+                }
+                
+                applyForce();
+            }
+            
+            // Apply the calculated forces to the nodes
+            function applyForce(){
+
+                for(var i = 0; i < allNodes.length; i++){
+                    
+                    prevPosition[i] = nodePositions[i];
+                    
+                    displacement += forceOnNode[i].length();
+                    
+                    forceOnNode[i].normalize();
+                    forceOnNode[i].divideScalar(layoutSpeed); // make this small at first and then get larger
+                    nodePositions[i].addVectors(nodePositions[i],  forceOnNode[i]);
+                    
+                    var distanceVec = new THREE.Vector3(0,0,0);
+                    
+                    distanceVec.subVectors(nodePositions[i], prevPosition[i]);
+                    
+                    var distanceMag = forceOnNode[i].length();
+
+                    
+                }
+                
+                
+                
+                
+                meanForce += displacement;
+                
+                var average = meanForce / meanForceIndexTracker;
+                
+                meanForceIndexTracker += 1;
+
+                if(displacement > maxForce){
+                    maxForce = displacement;
+                    minForce = displacement;
+                }
+                if(displacement < minForce){
+                    minForce = displacement;
+                }
+
+                percentForce = ((maxForce - average) / maxForce) * 100;
+                
+                
+                if(percentForce > 99.9){
+                    calculating = false;
+                    
+                }
+                console.log(percentForce);
+                
+                /*
+                if(percentForce > 96 && percentForce < 97){
+                    layoutSpeed = 10;
+                }
+                else if(percentForce > 97 && percentForce < 98){
+                    layoutSpeed = 25;
+                }
+                else if(percentForce > 98 && percentForce < 99){
+                    layoutSpeed = 50;
+                }
+                */
+                if(percentForce > 98 && percentForce < 99){
+                    layoutSpeed = 5;
+                }
+                else if(percentForce >= 99){
+                    layoutSpeed = 10;
+                }
+                /*
+                else if(percentForce >= 99.5){
+                    layoutSpeed = 25;
+                }
+                */
+                
+                displacement = 0;
+                
+                
+                //if(steps % 100 == 0){
+                    //updatePosition();
+                //}
+                
+                
+                elapsed = new Date() - start;
+                
+                //console.dir(elapsed);
+                
+                steps += 1;
+                
+                stepTime += elapsed;
+                
+                if(calculating == false){
+                    var structure = document.querySelector('#structure');
+                    for(var i = 0; i < allNodes.length; i++){
+                        structure.appendChild(allNodes[i]);
+                    }
+                    /*
+                    for(var i = 0; i < allEdges.length; i++){
+                        structure.appendChild(allEdges[i]);
+                    }*/
+                    //updatePosition();
+                    moveNodesAnimation();
+                    console.log("steps: " + steps);
+                    averageStepTime = stepTime / steps;
+                    console.log("averageStepTime: " + averageStepTime);
+               }
+               
+            }
+            
+            function loading(){
+                document.querySelector("#loadingPlane").setAttribute('rotation', '0 0 ' + loadingPlaneRotation);
+                loadingPlaneRotation -= 10;
+            }
+            
+            // Update the nodes and edges positions based on the applied forces
+            function updatePosition(){
+                /*
+                for(var i = 0; i < allNodes.length; i++){
+                    allNodes[i].setAttribute('position', '' + startPositions[i].x + ' ' + startPositions[i].y + ' ' + startPositions[i].z);
+                }
+                */
+                for(var i = 0; i < allEdges.length; i++){
+                    structure.appendChild(allEdges[i]);
+                    
+                    allEdges[i].setAttribute('line', {
+                            start: '' + nodePositions[allEdges[i].getAttribute('source')].x + ' ' + nodePositions[allEdges[i].getAttribute('source')].y + ' ' + nodePositions[allEdges[i].getAttribute('source')].z + '',
+                            end: '' + nodePositions[allEdges[i].getAttribute('target')].x + ' ' + nodePositions[allEdges[i].getAttribute('target')].y + ' ' + nodePositions[allEdges[i].getAttribute('target')].z + '',
+                            color: '#FFF'
+                        });
+                    
+                     
+                }
+                /*
+                if(calculating == false){
+                    updateEdgeAnimation();
+                    moveNodesAnimation();
+                }
+                */
+                
+                //updateEdgeAnimation();
+                
+                elapsed = new Date() - start;
+                
+                //console.dir(elapsed);
+                
+                /*
+                steps += 1;
+                
+                stepTime += elapsed;
+                
+                if(calculating == false){
+                    console.log("steps: " + steps);
+                    averageStepTime = stepTime / steps;
+                    console.log("averageStepTime: " + averageStepTime);
+                }
+                */
+                
+                
+                
+                
+                
+            }
+            
+            function moveNodesAnimation(){
+                for(var i = 0; i < allNodes.length; i++){
+                    var nodeMoveAnimation = document.createElement('a-animation');
+                      //nodeMoveAnimation.setAttribute('easing', 'ease-out');
+                    
+                      nodeMoveAnimation.setAttribute('attribute', 'position');
+                    
+                      
+                      nodeMoveAnimation.setAttribute('from', '' + startPositions[i].x + ' ' + startPositions[i].y + ' ' + startPositions[i].z + '');
+                      nodeMoveAnimation.setAttribute('to', '' + nodePositions[i].x + ' ' + nodePositions[i].y + ' ' + nodePositions[i].z + '');
+                      //var ranNum = Math.floor(Math.random() * 1000) + 4000;
+                      nodeMoveAnimation.setAttribute('dur', 5000);
+                      //allNodes[currentNeighbors[i]].appendChild(nodeMoveAnimation);
+                      allNodes[i].appendChild(nodeMoveAnimation);
+                }
+                console.dir(startPositions);
+                console.dir(nodePositions);
+            }
+            
+            function updateEdgeAnimation(){
+                for(var i = 0; i < allEdges.length; i++){
+                    var source = allEdges[i].getAttribute('source');
+                    var target = allEdges[i].getAttribute('target');
+                    
+                    var newSphere = document.createElement('a-entity');
+                    
+                    newSphere.setAttribute('geometry',{
+                            primitive: 'sphere',
+                            //radiusTop: 0,
+                            //radiusBottom: nodeSize / 50,
+                            //height: 0.25,
+                            //width: 0.25,
+                            //depth: 0.25
+                            radius: 0.15,
+                            buffer: true
+                        });
+                    
+                    
+                    /*
+                    newSphere.setAttribute('material',{
+                        opacity: 0.55,
+                        color: 'rgb(' + (Math.floor(Math.random * 255)) + ", " + (Math.floor(Math.random * 255)) + ", " + (Math.floor(Math.random * 255)) + ")"
+                    });
+                    */
+                    //newSphere.setAttribute('radius', '0.075');
+                    //newSphere.setAttribute('color', "green");
+                    //newSphere.setAttribute('opacity', "0.5");
+                    //newSphere.setAttribute('buffer', true);
+                    
+                    
+                    
+                    var nodeMoveAnimation = document.createElement('a-animation');
+                      //nodeMoveAnimation.setAttribute('easing', 'ease-out');
+                    
+                      nodeMoveAnimation.setAttribute('attribute', 'position');
+                    
+                      nodeMoveAnimation.setAttribute("repeat", "indefinite");
+                      nodeMoveAnimation.setAttribute('from', '' + nodePositions[source].x + ' ' + nodePositions[source].y + ' ' + nodePositions[source].z + '');
+                      nodeMoveAnimation.setAttribute('to', '' + nodePositions[target].x + ' ' + nodePositions[target].y + ' ' + nodePositions[target].z + '');
+                      var ranNum = Math.floor(Math.random() * 1000) + 4000;
+                      nodeMoveAnimation.setAttribute('dur', ranNum);
+                      //allNodes[currentNeighbors[i]].appendChild(nodeMoveAnimation);
+                      newSphere.appendChild(nodeMoveAnimation);
+                      document.querySelector("#structure").appendChild(newSphere);
+                      //previousNeighbors.push(allNodes[currentNeighbors[i]]);
+                }
+            }
+            
+            
+            function loadJSONGraph(){
+                var nodes = customGraph.nodes;
+                var edges = customGraph.edges;
+                
+                for(var i = 0; i < nodes.length; i++){
+                    var node = nodes[i];
+                    
+                    var nodeID = node.id;
+                    
+                    nodePositions[i] = new THREE.Vector3(Math.random(), Math.random(), Math.random());
+
+                    var nodeSphere = document.createElement('a-entity');
+                    nodeSphere.setAttribute('geometry', {
+                            primitive: 'box',
+                            //radiusTop: 0,
+                            //radiusBottom: nodeSize / 50,
+                            height: nodeSize / 30,
+                            width: nodeSize / 30,
+                            depth: nodeSize / 30
+                        });
+                    
+                    nodeSphere.setAttribute('position', {
+                            x: nodePositions[i].x,
+                            y: nodePositions[i].y,
+                            z: nodePositions[i].z
+                        })
+                    
+                     allNodes.push(nodeSphere);
+                     document.querySelector('#structure').appendChild(nodeSphere);
+                    
+                    
+                    var edgeLine = document.createElement('a-entity');
+                        
+                    edgeLine.setAttribute('line', {
+                        start: '' + nodePositions[i].x + ' ' + nodePositions[i].y + ' ' + nodePositions[i].z + '',
+                        end: '' + nodePositions[i].x + ' ' + (nodePositions[i].y + 1) + ' ' + nodePositions[i].z + '',
+                        color: '#red'
+                    });
+
+                    //debugLines.push(edgeLine);
+                    document.querySelector('#structure').appendChild(edgeLine);
+                }
+                
+                for(var i = 0; i < edges.length + 1; i++){
+                        neighborList[i] = [];
+                    }
+                
+                for(var i = 0; i < edges.length; i++){
+                    var edge = edges[i];
+                    
+                    var edgeSource = edge.source;
+                    
+                    var edgeTarget = edge.target;
+                    
+                    var edgeLine = document.createElement('a-entity');
+                    
+                    var sourcePosition = nodePositions[Math.floor(edgeSource)];
+                    var targetPosition = nodePositions[Math.floor(edgeTarget)];
+                    
+                    neighborList[Math.floor(edgeSource)].push(Math.floor(edgeTarget));
+                    neighborList[Math.floor(edgeTarget)].push(Math.floor(edgeSource));
+
+                    edgeLine.setAttribute('source', Math.floor(edgeSource));
+                    edgeLine.setAttribute('target', Math.floor(edgeTarget));
+                    
+                    edgeLine.setAttribute('line', {
+                        start: '' + sourcePosition.x + ' ' + sourcePosition.y + ' ' + sourcePosition.z + '',
+                        end: '' + targetPosition.x + ' ' + targetPosition.y + ' ' + targetPosition.z + '',
+                        color: '#FFF'
+                    });
+                    edgeLine.setAttribute('buffer', true);
+
+                    allEdges.push(edgeLine);
+                    document.querySelector('#structure').appendChild(edgeLine);
+                    
+                }
+                
+                update();
+            }
+            
+            
+            // Load data from xml file
+            function loadData(){
+                var xhr = new XMLHttpRequest();
+
+                // Once XML Request has loaded
+                xhr.onload = function(){
+                    
+                    // Store xml response in variable
+                    var xml = xhr.responseXML;
+
+                    // get nodes and edges from xml
+                    var nodes = xml.querySelectorAll('node');
+                    //console.dir(nodes);
+                    var edges = xml.querySelectorAll('edge');
+                    //console.dir(nodes);
+                 
+                    // Loop through all nodes
+                    // Get all node attributes
+                    // Create sphere for node's position and size
+                    // Create text for label
+                    for(var i = 0; i < nodes.length; i++){
+                        // get the current node
+                        var node = nodes[i];
+                        // get the current node's id
+                        var nodeID = node.getAttribute('id');
+                        // get the current node's label
+                        var nodeLabel = node.getAttribute('label');
+
+                        // get the current node's x position
+                        var nodePositionX = node.querySelector('position').getAttribute('x');
+                        if(!nodePositionX){
+                            nodePositionX = nodeID;
+                        }
+                        // get the current node's y position
+                        var nodePositionY = node.querySelector('position').getAttribute('y');
+                         if(!nodePositionY){
+                            nodePositionY = nodeID;
+                        }
+
+                        var xyDistance = Math.sqrt((nodePositionX * nodePositionX) + (nodePositionY * nodePositionY));
+                        xyDistance /= 550;
+                        var randMultiplyer = Math.floor((Math.random() * 100)) % 2;                       
+                        if(randMultiplyer == 0){
+                            randMultiplyer = -1;
+                        }
+                        else {
+                            randMultiplyer = 1;
+                        }
+                        var randomZ = (Math.random() * randMultiplyer * xyDistance) -5;
+                        
+                        // Set a random Z coordinate for the node (within a range of values)
+                        
+                        // Save the node's position
+                        //nodePositions[i] = new THREE.Vector3((nodePositionX / 100), (nodePositionY / 100), randomZ);
+                        nodePositions[i] = new THREE.Vector3(Math.random(), Math.random(), Math.random());
+                        startPositions[i] = new THREE.Vector3(nodePositions[i].x, nodePositions.y, nodePositions.z);
+                        
+                        // get the current node's size
+                        var nodeSize = node.querySelector('size').getAttribute('value');
+                        
+                       
+
+                        if(!nodeSize){
+                            nodeSize = 0.1;
+                        }
+
+                        // get the current node's r color value
+                        var nodeColorR = node.querySelector('color').getAttribute('r');
+                         if(!nodeColorR){
+                             nodeColorR = 0;
+                         }
+                         // get the current node's g color value
+                        var nodeColorG = node.querySelector('color').getAttribute('g');
+                         if(!nodeColorG){
+                             nodeColorG = 0;
+                         }
+                         // get the current node's b color value
+                        var nodeColorB = node.querySelector('color').getAttribute('b');
+                         if(!nodeColorB){
+                             nodeColorB = 0;
+                         }
+                        
+                        // create sphere for node
+                        var nodeSphere = document.createElement('a-entity');
+                        nodeSphere.setAttribute('geometry', {
+                            primitive: 'sphere',
+                            radius: nodeSize / 50,
+                            //radiusBottom: nodeSize / 50,
+                            //height: nodeSize / 30,
+                            //width: nodeSize / 30,
+                            //depth: nodeSize / 30
+                        });
+                        //nodeSphere.setAttribute('height', nodeSize / 80);
+                        //nodeSphere.setAttribute('width', nodeSize / 80);
+                        
+                        nodeSphere.setAttribute('position', {
+                            x: startPositions[i].z,
+                            y: startPositions[i].y,
+                            z: startPositions[i].z
+                        })
+                        
+                        nodeSphere.setAttribute('material', {
+                            color: 'rgb(' + nodeColorR + ',' + nodeColorG + ',' + nodeColorB +')',
+                            //normalMap: 'media/normalMap2.png'
+                            metalness: '0.25'
+                            
+                        });
+                        nodeSphere.setAttribute('size', nodeSize);
+                        nodeSphere.setAttribute('buffer', true);
+                        
+                        nodeSphere.setAttribute('cursor-listener', true);
+                        nodeSphere.setAttribute('label', nodeLabel);
+                        nodeSphere.setAttribute('nodeID', nodeID);
+                        nodeSphere.setAttribute('isSelected', false);
+                        nodeSphere.setAttribute('class', 'collidable')
+                        allNodes.push(nodeSphere);
+                        //document.querySelector('#structure').appendChild(nodeSphere);
+
+                    }
+                    
+                    // Define neighborList indices as arrays
+                    for(var i = 0; i < edges.length + 1; i++){
+                        neighborList[i] = [];
+                    }
+                   
+                    // Loop through all edges
+                    // Get all edge attributes
+                    for(var i = 0; i < edges.length; i++){
+                        // get current edge
+                        var edge = edges[i];
+                        // get current edge's id
+                        var edgeID = edge.getAttribute('id');
+                        // get current edge's source
+                        var edgeSource = edge.getAttribute('source');
+                        // get current edge's target
+                        var edgeTarget = edge.getAttribute('target');
+
+                        var sourcePosition = nodePositions[Math.floor(edgeSource)];
+                        var targetPosition = nodePositions[Math.floor(edgeTarget)];
+                        
+                        neighborList[Math.floor(edgeSource)].push(Math.floor(edgeTarget));
+                        neighborList[Math.floor(edgeTarget)].push(Math.floor(edgeSource));
+                        
+                        var edgeLine = document.createElement('a-entity');
+                        
+                        edgeLine.setAttribute('source', Math.floor(edgeSource));
+                        edgeLine.setAttribute('target', Math.floor(edgeTarget));
+                        
+                        var randomOpacity = Math.random() * 0.7 + 0.3;
+                        
+                        edgeLine.setAttribute('line', {
+                            start: '' + sourcePosition.x + ' ' + sourcePosition.y + ' ' + sourcePosition.z + '',
+                            end: '' + targetPosition.x + ' ' + targetPosition.y + ' ' + targetPosition.z + '',
+                            color: '#FFF',
+                            opacity: randomOpacity
+                        });
+                        
+                        edgeLine.setAttribute('weight', "" + Math.ceil(Math.random() * 5));
+                        
+                        edgeLine.setAttribute('cursor-listener', false);
+                        edgeLine.setAttribute('class', "ignore-ray");
+                        allEdges.push(edgeLine);
+                        //document.querySelector('#structure').appendChild(edgeLine);var nodeMoveAnimation = document.createElement('a-animation');
+                        
+                        
+                      //nodeMoveAnimation.setAttribute('easing', 'ease-out');
+                    /*
+                      var nodeMoveAnimation = document.createElement('a-animation');
+                      nodeMoveAnimation.setAttribute('attribute', 'line.start');
+                    
+                      nodeMoveAnimation.setAttribute("repeat", "indefinite");
+                      nodeMoveAnimation.setAttribute('from', '' + sourcePosition.x + ' ' + sourcePosition.y + ' ' + sourcePosition.z + '');
+                      nodeMoveAnimation.setAttribute('to', '' + targetPosition.x + ' ' + targetPosition.y + ' ' + targetPosition.z + '');
+                      var ranNum = Math.floor(Math.random() * 1000) + 4000;
+                      nodeMoveAnimation.setAttribute('dur', ranNum);
+                      //allNodes[currentNeighbors[i]].appendChild(nodeMoveAnimation);
+                      //newSphere.appendChild(nodeMoveAnimation);
+                        edgeLine.appendChild(nodeMoveAnimation);
+                      //document.querySelector("#structure").appendChild(newSphere);
+                      */
+                    }
+                    
+                    for(var i = 0; i < allNodes.length; i++){
+                        forceOnNode[i] = new THREE.Vector3(0, 0, 0);
+                     }
+                    update();
+                    //console.dir(neighborList);
+                    
+                    cursor.setAttribute('raycaster', {
+                        objects: '.collidable'
+                    });
+                    
+                }
+
+                // store the path to the data file
+                var path = "data/gephi.exported.xml";
+
+                // open the xml request
+                xhr.open('GET', path, true);
+                // set request header
+                xhr.setRequestHeader("If-Modified-Since", "Sat, 1 Jan 2010 00:00:00 GMT");
+                // send the request
+                xhr.send();
+
+            }
+
+            // Load init when page has loaded
+            window.onload = init;
+            
+        }());
+
+    </script>
+    
+</head>
+
+<body>
+    
+    <a-scene id="scene" antialias="true">
+
+     <a-entity id="structure" position='0 0 -5'>
+      
+      </a-entity>
+        
+        
+        <a-camera id='camera' fov='50' position="0 0 75" wasd-controls='fly: true'>
+            <a-entity id='loadingPlane'></a-entity>
+            <a-entity id="cursor" cursor="fuse: true"
+              raycaster="far: 20; interval: 1000"
+              scale='0.05 0.05 0.05'
+              position='0 0 -1.5'
+              geometry="primitive: ring"
+              class='ignore-ray'
+              material="color: white">
+              
+              <a-animation begin="click" easing="ease-in" attribute="scale"
+                     fill="backwards" from="0.01 0.01 0.01" to="0.05 0.05 0.05" dur="500"></a-animation>
+              
+            
+            <a-animation begin="cursor-fusing" easing="ease-in" attribute="material.color"
+                           fill="forwards" from="white" to="#00FF00" dur="1500"></a-animation>
+            
+            <a-animation begin="click" easing="ease-in" attribute="material.color"
+                           fill="forwards" from="#00FF00" to="white" dur="500"></a-animation>
+              
+            </a-entity>
+            
+        </a-camera>
+
+      <a-entity id="planets"></a-entity>
+      
+      <a-sky color="black" class='ignore-ray' cursor-listener='false'></a-sky>
+
+      
+    </a-scene>
+    
+</body>
+
+</html>

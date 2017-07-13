@@ -337,6 +337,7 @@
                             distanceVec.normalize();
 
                             var springForce = distanceVec.multiplyScalar(springConstant * Math.log(distanceMag));
+                            //var springForce = distanceVec.multiplyScalar(springConstant * 15);
                             
                             forceOnNode[i].addVectors(forceOnNode[i], springForce);
 
@@ -448,8 +449,8 @@
                 //console.log(percentForce + "%")
                 
                 displacement = 0;
-                //updatePosition();
-                
+                updatePosition();
+                /*
                 if(calculating == false){
                     var structure = document.querySelector('#structure');
                     for(var i = 0; i < allNodes.length; i++){
@@ -459,7 +460,7 @@
                         structure.appendChild(allEdges[i]);
                     }
                     updatePosition();
-               }
+               }*/
             }
             
             // Update the nodes and edges positions based on the applied forces
@@ -660,7 +661,7 @@
                         nodeSphere.setAttribute('isSelected', false);
                         nodeSphere.setAttribute('class', 'collidable')
                         allNodes.push(nodeSphere);
-                        //document.querySelector('#structure').appendChild(nodeSphere);
+                        document.querySelector('#structure').appendChild(nodeSphere);
 
                     }
                     
@@ -701,8 +702,9 @@
                         
                         edgeLine.setAttribute('cursor-listener', false);
                         edgeLine.setAttribute('class', "ignore-ray");
+                        edgeLine.setAttribute('strength', "" + Math.floor(Math.random() * 50));
                         allEdges.push(edgeLine);
-                        //document.querySelector('#structure').appendChild(edgeLine);
+                        document.querySelector('#structure').appendChild(edgeLine);
 
                     }
 
