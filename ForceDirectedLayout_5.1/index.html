@@ -450,7 +450,7 @@
 
                     distanceVec.normalize();
                     
-                    var springForce = distanceVec.multiplyScalar(springConstant * (distanceMag - (10/edgeWeight)));
+                    var springForce = distanceVec.multiplyScalar(springConstant * (distanceMag - 1));
 
                     forceOnNode[sourceNode].addVectors(forceOnNode[sourceNode], springForce);
                     
@@ -536,7 +536,7 @@
                 }
                 
                
-                */  
+                */ 
                 for(var i = 0; i < allNodes.length; i++){
                     
  
@@ -548,7 +548,7 @@
                                 //if(k != neighborList[k]){
                                      var distanceMag = nodePositions[j].distanceTo(nodePositions[i]);
                             
-                                    if(distanceMag < 50){
+                                    if(distanceMag < 25){
                                         var distanceVec = new THREE.Vector3(0, 0, 0);
 
                                         distanceVec.subVectors(nodePositions[j], nodePositions[i]);
@@ -572,7 +572,7 @@
                     }
                     
                 }
-                
+                 
                 applyForce();
             }
             
@@ -773,7 +773,8 @@
                     
                     // Store xml response in variable
                     var xml = xhr.responseXML;
-
+                    console.dir(xhr);
+                    
                     // get nodes and edges from xml
                     var nodes = xml.querySelectorAll('node');
                     //console.dir(nodes);
@@ -792,6 +793,7 @@
                         // get the current node's label
                         var nodeLabel = node.getAttribute('label');
 
+                        /*
                         // get the current node's x position
                         var nodePositionX = node.querySelector('position').getAttribute('x');
                         if(!nodePositionX){
@@ -802,7 +804,7 @@
                          if(!nodePositionY){
                             nodePositionY = nodeID;
                         }
-
+                        
                         var xyDistance = Math.sqrt((nodePositionX * nodePositionX) + (nodePositionY * nodePositionY));
                         xyDistance /= 550;
                         var randMultiplyer = Math.floor((Math.random() * 100)) % 2;                       
@@ -813,7 +815,7 @@
                             randMultiplyer = 1;
                         }
                         var randomZ = (Math.random() * randMultiplyer * xyDistance) -5;
-                        
+                        */
                         // Set a random Z coordinate for the node (within a range of values)
                         
                         // Save the node's position
@@ -821,6 +823,7 @@
                         nodePositions[i] = new THREE.Vector3(Math.random(), Math.random(), Math.random());
                         startPositions[i] = new THREE.Vector3(nodePositions[i].x, nodePositions.y, nodePositions.z);
                         
+                        /*
                         // get the current node's size
                         var nodeSize = node.querySelector('size').getAttribute('value');
                         
@@ -829,7 +832,7 @@
                         if(!nodeSize){
                             nodeSize = 0.1;
                         }
-
+                        
                         // get the current node's r color value
                         var nodeColorR = node.querySelector('color').getAttribute('r');
                          if(!nodeColorR){
@@ -845,12 +848,12 @@
                          if(!nodeColorB){
                              nodeColorB = 0;
                          }
-                        
+                        */
                         // create sphere for node
                         var nodeSphere = document.createElement('a-entity');
                         nodeSphere.setAttribute('geometry', {
                             primitive: 'sphere',
-                            radius: nodeSize / 50,
+                            radius: 0.2,
                             //radiusBottom: nodeSize / 50,
                             //height: nodeSize / 30,
                             //width: nodeSize / 30,
@@ -866,12 +869,12 @@
                         })
                         
                         nodeSphere.setAttribute('material', {
-                            color: 'rgb(' + nodeColorR + ',' + nodeColorG + ',' + nodeColorB +')',
+                            //color: 'rgb(' + nodeColorR + ',' + nodeColorG + ',' + nodeColorB +')',
                             normalMap: 'media/normalMap7.jpg',
                             metalness: '0.0',
                             //fog: 'type: linear; color: #AAA'
                         });
-                        nodeSphere.setAttribute('size', nodeSize);
+                        //nodeSphere.setAttribute('size', nodeSize);
                         nodeSphere.setAttribute('buffer', true);
                         
                         nodeSphere.setAttribute('cursor-listener', true);
@@ -900,6 +903,8 @@
                         var edgeSource = edge.getAttribute('source');
                         // get current edge's target
                         var edgeTarget = edge.getAttribute('target');
+                        
+                        var edgeWeight = edge.getAttribute('distance');
 
                         var sourcePosition = nodePositions[Math.floor(edgeSource)];
                         var targetPosition = nodePositions[Math.floor(edgeTarget)];
@@ -919,7 +924,7 @@
                             opacity: 0.25
                         });
                         //console.log(allNodes[Math.floor(edgeSource)].getAttribute('size'));
-                        edgeLine.setAttribute('weight', "" + (Math.ceil(Math.random() * 10) + 5) + "");
+                        edgeLine.setAttribute('weight', edgeWeight);
                         
                         edgeLine.setAttribute('cursor-listener', false);
                         edgeLine.setAttribute('class', "ignore-ray");
@@ -950,7 +955,7 @@
                 }
 
                 // store the path to the data file
-                var path = "data/gephi.exported.xml";
+                var path = "data/biomap_v2.xml";
 
                 // open the xml request
                 xhr.open('GET', path, true);
@@ -982,7 +987,7 @@
       
             </a-entity>
         
-        <a-camera id='camera' fov='50' near="1.49" position="0 0 50" wasd-controls='enabled: false'>
+        <a-camera id='camera' fov='50' near="0.5" position="0 0 50" wasd-controls='enabled: false'>
             
             <a-entity id="cursor" cursor="fuse: true"
               raycaster="far: 100; interval: 1000"
