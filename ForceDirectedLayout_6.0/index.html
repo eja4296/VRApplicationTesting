@@ -40,7 +40,7 @@
             // Force Constants
             const springConstant = 8;
             const coulombConstant = 8.99 * Math.pow(10,9);
-            const nodeCharge = 0.000025;
+            const nodeCharge = 0.00005;
             const springEquilibrium = 1;
 
             
@@ -408,8 +408,6 @@
                     cameraSpeed.multiplyScalar(0);
                 }
                 
-                console.log(cameraSpeed);
-                
                 //console.log(camera.getAttribute('rotation'));
                 
             }
@@ -450,7 +448,7 @@
 
                     distanceVec.normalize();
                     
-                    var springForce = distanceVec.multiplyScalar(springConstant * (distanceMag - 1));
+                    var springForce = distanceVec.multiplyScalar(springConstant *5 * (distanceMag - 1));
 
                     forceOnNode[sourceNode].addVectors(forceOnNode[sourceNode], springForce);
                     
@@ -556,7 +554,8 @@
                                         distanceVec.normalize();
 
                                         var magneticForce = distanceVec.multiplyScalar(-coulombConstant * ((nodeCharge * nodeCharge) / (distanceMag * distanceMag)));
-
+                                        //var magneticForce = new THREE.Vector3(1, 1, 1);
+                                        //console.dir(magneticForce);
                                         forceOnNode[i].addVectors(forceOnNode[i], magneticForce); 
                                 }
                                 
@@ -594,7 +593,7 @@
 
                     distanceVec.normalize();
                     
-                    var springForce = distanceVec.multiplyScalar(springConstant * (distanceMag - edgeWeight));
+                    var springForce = distanceVec.multiplyScalar(springConstant * (distanceMag - 1));
 
                     forceOnNode[sourceNode].addVectors(forceOnNode[sourceNode], springForce);
                     
@@ -706,7 +705,7 @@
                     allEdges[i].setAttribute('line', {
                             start: '' + nodePositions[allEdges[i].getAttribute('source')].x + ' ' + nodePositions[allEdges[i].getAttribute('source')].y + ' ' + nodePositions[allEdges[i].getAttribute('source')].z + '',
                             end: '' + nodePositions[allEdges[i].getAttribute('target')].x + ' ' + nodePositions[allEdges[i].getAttribute('target')].y + ' ' + nodePositions[allEdges[i].getAttribute('target')].z + '',
-                            color: '#FFF'
+                            //color: '#FFF'
                         });
                 }
 
@@ -785,6 +784,71 @@
                     // Get all node attributes
                     // Create sphere for node's position and size
                     // Create text for label
+                    
+                    
+                    // Define neighborList indices as arrays
+                    for(var i = 0; i < edges.length + 1; i++){
+                        neighborList[i] = [];
+                    }
+                   
+                    // Loop through all edges
+                    // Get all edge attributes
+                    for(var i = 0; i < edges.length; i++){
+                        // get current edge
+                        var edge = edges[i];
+                        // get current edge's id
+                        var edgeID = edge.getAttribute('id');
+                        // get current edge's source
+                        var edgeSource = edge.getAttribute('source');
+                        // get current edge's target
+                        var edgeTarget = edge.getAttribute('target');
+                        
+                        var pearson = edge.getAttribute('Rp');
+                        
+
+                        //var sourcePosition = nodePositions[Math.floor(edgeSource)];
+                        //var targetPosition = nodePositions[Math.floor(edgeTarget)];
+                        
+                        neighborList[Math.floor(edgeSource)].push(Math.floor(edgeTarget));
+                        neighborList[Math.floor(edgeTarget)].push(Math.floor(edgeSource));
+                        
+                        var edgeLine = document.createElement('a-entity');
+                        
+                        edgeLine.setAttribute('source', Math.floor(edgeSource));
+                        edgeLine.setAttribute('target', Math.floor(edgeTarget));
+                        
+                        
+                        
+                        if(pearson > 0.7){
+                            edgeLine.setAttribute('line', {
+                                //start: '' + sourcePosition.x + ' ' + sourcePosition.y + ' ' + sourcePosition.z + '',
+                                //end: '' + targetPosition.x + ' ' + targetPosition.y + ' ' + targetPosition.z + '',
+                                color: '#0F0',
+                                //opacity: 0.25
+                            });
+                            console.log(pearson);
+                        }
+                        else{
+                            edgeLine.setAttribute('line', {
+                                //start: '' + sourcePosition.x + ' ' + sourcePosition.y + ' ' + sourcePosition.z + '',
+                                //end: '' + targetPosition.x + ' ' + targetPosition.y + ' ' + targetPosition.z + '',
+                                color: '#FFF',
+                                opacity: 0.25
+                            });
+                        }
+                        //console.log(allNodes[Math.floor(edgeSource)].getAttribute('size'));
+                        edgeLine.setAttribute('weight', (pearson));
+                        
+                        edgeLine.setAttribute('cursor-listener', false);
+                        edgeLine.setAttribute('class', "ignore-ray");
+                        allEdges.push(edgeLine);
+                        document.querySelector('#structure').appendChild(edgeLine);
+                        
+                        var nodeMoveAnimation = document.createElement('a-animation');
+                        
+                   
+                    }
+                    
                     for(var i = 0; i < nodes.length; i++){
                         // get the current node
                         var node = nodes[i];
@@ -853,12 +917,13 @@
                         var nodeSphere = document.createElement('a-entity');
                         nodeSphere.setAttribute('geometry', {
                             primitive: 'sphere',
-                            radius: 0.2,
+                            radius: ((Math.log(neighborList[i].length) + 1) / 10),
                             //radiusBottom: nodeSize / 50,
-                            //height: nodeSize / 30,
-                            //width: nodeSize / 30,
-                            //depth: nodeSize / 30
+                            //height: ((Math.log(neighborList[i].length) + 1) / 5),
+                            //width: ((Math.log(neighborList[i].length) + 1) / 5),
+                            //depth: ((Math.log(neighborList[i].length) + 1) / 5)
                         });
+                       
                         //nodeSphere.setAttribute('height', nodeSize / 80);
                         //nodeSphere.setAttribute('width', nodeSize / 80);
                         
@@ -869,10 +934,11 @@
                         })
                         
                         nodeSphere.setAttribute('material', {
-                            //color: 'rgb(' + nodeColorR + ',' + nodeColorG + ',' + nodeColorB +')',
-                            normalMap: 'media/normalMap7.jpg',
+                            color: 'rgb(' + (neighborList[i].length * 5) + ',' + 0 + ',' + 0 +')',
+                            //normalMap: 'media/normalMap7.jpg',
                             metalness: '0.0',
                             //fog: 'type: linear; color: #AAA'
+                            //opacity: (neighborList[i].length / 100) + 0.2
                         });
                         //nodeSphere.setAttribute('size', nodeSize);
                         nodeSphere.setAttribute('buffer', true);
@@ -885,55 +951,6 @@
                         allNodes.push(nodeSphere);
                         document.querySelector('#structure').appendChild(nodeSphere);
 
-                    }
-                    
-                    // Define neighborList indices as arrays
-                    for(var i = 0; i < edges.length + 1; i++){
-                        neighborList[i] = [];
-                    }
-                   
-                    // Loop through all edges
-                    // Get all edge attributes
-                    for(var i = 0; i < edges.length; i++){
-                        // get current edge
-                        var edge = edges[i];
-                        // get current edge's id
-                        var edgeID = edge.getAttribute('id');
-                        // get current edge's source
-                        var edgeSource = edge.getAttribute('source');
-                        // get current edge's target
-                        var edgeTarget = edge.getAttribute('target');
-                        
-                        var edgeWeight = edge.getAttribute('distance');
-
-                        var sourcePosition = nodePositions[Math.floor(edgeSource)];
-                        var targetPosition = nodePositions[Math.floor(edgeTarget)];
-                        
-                        neighborList[Math.floor(edgeSource)].push(Math.floor(edgeTarget));
-                        neighborList[Math.floor(edgeTarget)].push(Math.floor(edgeSource));
-                        
-                        var edgeLine = document.createElement('a-entity');
-                        
-                        edgeLine.setAttribute('source', Math.floor(edgeSource));
-                        edgeLine.setAttribute('target', Math.floor(edgeTarget));
-                        
-                        edgeLine.setAttribute('line', {
-                            start: '' + sourcePosition.x + ' ' + sourcePosition.y + ' ' + sourcePosition.z + '',
-                            end: '' + targetPosition.x + ' ' + targetPosition.y + ' ' + targetPosition.z + '',
-                            color: '#FFF',
-                            opacity: 0.25
-                        });
-                        //console.log(allNodes[Math.floor(edgeSource)].getAttribute('size'));
-                        edgeLine.setAttribute('weight', edgeWeight);
-                        
-                        edgeLine.setAttribute('cursor-listener', false);
-                        edgeLine.setAttribute('class', "ignore-ray");
-                        allEdges.push(edgeLine);
-                        document.querySelector('#structure').appendChild(edgeLine);
-                        
-                        var nodeMoveAnimation = document.createElement('a-animation');
-                        
-                   
                     }
                     
                     for(var i = 0; i < allNodes.length; i++){
@@ -955,7 +972,7 @@
                 }
 
                 // store the path to the data file
-                var path = "data/gephi.exported.xml";
+                var path = "data/biomap_v3.xml";
 
                 // open the xml request
                 xhr.open('GET', path, true);
@@ -987,7 +1004,7 @@
       
             </a-entity>
         
-        <a-camera id='camera' fov='50' near="0.5" position="0 0 50" wasd-controls='enabled: false'>
+        <a-camera id='camera' fov='50' near="0.5" position="0 0 50" reverse-mouse-drag='false' wasd-controls='enabled: false'>
             
             <a-entity id="cursor" cursor="fuse: true"
               raycaster="far: 100; interval: 1000"

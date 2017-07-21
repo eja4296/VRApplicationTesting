@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8"/>
+    <title>VR Graph/Network Data Visualization Application Prototype</title>
+    <style>
+
+    </style>
+    <!-- import aFrame Library -->
+    <script src="https://aframe.io/releases/0.6.1/aframe.min.js"></script>
+    
+    <!-- Main Script -->
+    <script>
+        // Load init when page has loaded
+        window.onload = init;
+        
+        // Starter function
+        function init(){
+            
+            var ascene = document.querySelector("#scene");
+            var box = document.querySelector('#box');
+            group = new THREE.Group();
+            var scene = document.querySelector('#scene').object3D;;
+            scene.add( group );
+            var renderer;
+            renderer = new THREE.WebGLRenderer({antialias: true});
+            renderer.setPixelRatio(window.devicePixelRatio);
+            document.body.appendChild(renderer.domElement);
+            aspect = window.innerWidth / window.innerHeight;
+            var camera;
+            camera = new THREE.PerspectiveCamera(75, aspect, 1, 1000);
+                camera.position.z = 5;
+            
+            //var camera = document.querySelector('#camera').object3D;
+            
+            for(var i = 0; i < 15; i++){
+                
+                for(var j = 0; j < 15; j++){
+                    
+                    for(var k = 0; k < 15; k++) {
+                        
+                         var nodeSphere = document.createElement('a-entity');
+                
+                        nodeSphere.setAttribute('geometry', {
+                            primitive: 'box',
+                            //radius: 0.15,
+                            //radiusBottom: nodeSize / 50,
+                            height: 0.1,
+                            width: 0.1,
+                            depth: 0.1,
+                            buffer: true,
+                            //mergeTo: box
+                            
+                        });
+                       
+                        //nodeSphere.setAttribute('height', nodeSize / 80);
+                        //nodeSphere.setAttribute('width', nodeSize / 80);
+                        
+                        nodeSphere.setAttribute('position', {
+                            x: i,
+                            y: j,
+                            z: k
+                        })
+                        
+                        nodeSphere.setAttribute('material', {
+                            color: 'black',
+                            //normalMap: 'media/normalMap7.jpg',
+                            metalness: '0.0'
+                            //fog: 'type: linear; color: #AAA'
+                        });
+                        //nodeSphere.setAttribute('size', nodeSize);
+                        //nodeSphere.setAttribute('buffer', true);
+                
+                        //console.log(nodeSphere.getAttribute('buffer'));
+
+                        ascene.appendChild(nodeSphere);
+                    
+                        
+                    }
+                    
+                   
+                    
+                }
+                
+            }
+            
+            var geometry = new THREE.BufferGeometry();
+				geometry.addAttribute( 'position', new THREE.BufferAttribute( 10, 3 ).setDynamic( true ) );
+				geometry.addAttribute( 'color', new THREE.BufferAttribute( 100, 3 ).setDynamic( true ) );
+				geometry.computeBoundingSphere();
+				geometry.setDrawRange( 0, 0 );
+				var material = new THREE.LineBasicMaterial( {
+					vertexColors: THREE.VertexColors,
+					blending: THREE.AdditiveBlending,
+					transparent: true
+				} );
+				linesMesh = new THREE.LineSegments( geometry, material );
+                group.add(linesMesh);
+            
+            
+            function render() {
+                // raycaster information
+                //raycaster.setFromCamera(mouse, camera)
+                
+                
+                    
+                
+                renderer.render(scene, camera);
+                // Uncomment when testing with VR
+                //(vrDisplay ? vrDisplay : window).requestAnimationFrame(render);
+                
+                //renderer.render(scene, camera);
+            };
+            
+            // Call animate to render
+            function animate() {
+                requestAnimationFrame(animate);
+                //updateEdgePosition();
+                render();
+            };
+            
+            animate();
+            //scene.appendChild(group);
+        }
+    </script>
+    
+</head>
+
+<body>
+    
+    <a-scene id="scene" stats antialias='true'>
+        <!--
+      <a-camera id='camera' position = "0 0 20">
+        <a-cursor></a-cursor>
+      </a-camera>
+-->
+       <a-box id='box'></a-box>
+      <a-sky color="#ECECEC"></a-sky>
+    </a-scene>
+    
+</body>
+
+</html>
