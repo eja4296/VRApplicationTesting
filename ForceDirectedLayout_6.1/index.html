@@ -14,6 +14,65 @@
     <script src="js/aframe-line-component.min.js"></script>
     <script src="js/keys.js"></script>
 
+    
+        <script id="vshader" type="x-shader/x-vertex">
+		precision highp float;
+		uniform mat4 modelViewMatrix;
+		uniform mat4 projectionMatrix;
+		uniform float time;
+
+		attribute vec3 position;
+		attribute vec2 uv;
+		attribute vec3 translate;
+
+		varying vec2 vUv;
+		varying float vScale;
+
+		void main() {
+
+			vec4 mvPosition = modelViewMatrix * vec4( translate, 1.0 );
+			vec3 trTime = vec3(translate.x + time,translate.y + time,translate.z + time);
+			float scale =  sin( trTime.x * 2.1 ) + sin( trTime.y * 3.2 ) + sin( trTime.z * 4.3 );
+			vScale = scale;
+			scale = scale * 10.0 + 10.0;
+			mvPosition.xyz += position * scale;
+			vUv = uv;
+			gl_Position = projectionMatrix * mvPosition;
+
+		}
+	</script>
+	<script id="fshader" type="x-shader/x-fragment">
+		precision highp float;
+
+		uniform sampler2D map;
+
+		varying vec2 vUv;
+		varying float vScale;
+
+		// HSL to RGB Convertion helpers
+		vec3 HUEtoRGB(float H){
+			H = mod(H,1.0);
+			float R = abs(H * 6.0 - 3.0) - 1.0;
+			float G = 2.0 - abs(H * 6.0 - 2.0);
+			float B = 2.0 - abs(H * 6.0 - 4.0);
+			return clamp(vec3(R,G,B),0.0,1.0);
+		}
+
+		vec3 HSLtoRGB(vec3 HSL){
+			vec3 RGB = HUEtoRGB(HSL.x);
+			float C = (1.0 - abs(2.0 * HSL.z - 1.0)) * HSL.y;
+			return (RGB - 0.5) * C + HSL.z;
+		}
+
+		void main() {
+			vec4 diffuseColor = texture2D( map, vUv );
+			gl_FragColor = vec4( diffuseColor.xyz * HSLtoRGB(vec3(vScale/5.0, 1.0, 0.5)), diffuseColor.w );
+
+			if ( diffuseColor.w < 0.5 ) discard;
+		}
+	</script>
+    
+    
     <!-- Main Script -->
     <script>
 
@@ -84,6 +143,20 @@
             var cameraMaxSpeed = 1;
             var menu;
             
+            var geometry;
+            var material;
+            var colors;
+            var positions;
+            var group;
+            var scene;
+            var renderer;
+            var mesh;
+            var nodeMesh;
+            var camera3;
+            var lineVertices;
+            var aspect;
+            
+            
             myKeys.KEYBOARD = Object.freeze({
                 "KEY_e": 69,
                 "KEY_q": 81,
@@ -109,6 +182,16 @@
                 // get aframe scene element
                 aScene = document.querySelector("#scene");
                 menu = document.querySelector('#menu');
+                group = new THREE.Group();
+                scene = document.querySelector('#scene').object3D;
+                scene.add( group );
+                renderer = new THREE.WebGLRenderer({antialias: true});
+                renderer.setPixelRatio(window.devicePixelRatio);
+                document.body.appendChild(renderer.domElement);
+                aspect = window.innerWidth / window.innerHeight;
+                camera3 = new THREE.PerspectiveCamera(75, aspect, 1, 1000);
+                
+                
                 // Node and Edge information holders
                 allNodes = [];
                 allEdges = [];
@@ -265,6 +348,10 @@
                     calcForce();
 
                 }
+                
+                renderer.render(scene, camera3);
+                mesh.geometry.attributes.position.needsUpdate = true;
+                nodeMesh.geometry.attributes.position.needsUpdate = true;
                 
                 /*
                 else{
@@ -677,7 +764,7 @@
                 
                 stepTime += elapsed;
                 
-                if(steps % 2 == 0){
+                if(steps % 10 == 0){
                     updatePosition();
                 }
                 
@@ -699,14 +786,28 @@
                         allNodes[i].setAttribute('position', '' + nodePositions[i].x + ' ' + nodePositions[i].y + ' ' + nodePositions[i].z);
                     //}
                     
+                    positions[i * 3] = nodePositions[i].x;
+                    positions[i * 3 + 1] = nodePositions[i].y;
+                    positions[i * 3 + 2] = nodePositions[i].z;
+                    
                 }
                 
                 for(var i = 0; i < allEdges.length; i++){
+                    /*
                     allEdges[i].setAttribute('line', {
                             start: '' + nodePositions[allEdges[i].getAttribute('source')].x + ' ' + nodePositions[allEdges[i].getAttribute('source')].y + ' ' + nodePositions[allEdges[i].getAttribute('source')].z + '',
                             end: '' + nodePositions[allEdges[i].getAttribute('target')].x + ' ' + nodePositions[allEdges[i].getAttribute('target')].y + ' ' + nodePositions[allEdges[i].getAttribute('target')].z + '',
                             //color: '#FFF'
                         });
+                    */
+                    
+                    lineVertices[i * 6] =  nodePositions[allEdges[i].getAttribute('source')].x;
+                    lineVertices[i * 6 + 1] =  nodePositions[allEdges[i].getAttribute('source')].y;
+                    lineVertices[i * 6 + 2] =  nodePositions[allEdges[i].getAttribute('source')].z;
+                    lineVertices[i * 6 + 3] =  nodePositions[allEdges[i].getAttribute('target')].x;
+                    lineVertices[i * 6 + 4] =  nodePositions[allEdges[i].getAttribute('target')].y;
+                    lineVertices[i * 6 + 5] =  nodePositions[allEdges[i].getAttribute('target')].z;
+                        
                 }
 
                 
@@ -791,6 +892,14 @@
                         neighborList[i] = [];
                     }
                    
+                    geometry = new THREE.BufferGeometry();
+                    material = new THREE.LineBasicMaterial({ vertexColors: THREE.VertexColors });
+                    
+                    colors = new Float32Array( edges.length * 6 );
+                    
+                    lineVertices = new Float32Array(edges.length * 6 );
+                    
+                    
                     // Loop through all edges
                     // Get all edge attributes
                     for(var i = 0; i < edges.length; i++){
@@ -811,6 +920,54 @@
                         
                         neighborList[Math.floor(edgeSource)].push(Math.floor(edgeTarget));
                         neighborList[Math.floor(edgeTarget)].push(Math.floor(edgeSource));
+                        
+                        // THREE BUFFER LINE
+                        
+                        /*
+                        //r = 800;
+                        for ( var i = 0; i < segments; i ++ ) {
+                            var x = Math.random() * r - r / 2;
+                            var y = Math.random() * r - r / 2;
+                            var z = Math.random() * r - r / 2;
+                            // positions
+                            positions[ i * 3 ] = x;
+                            positions[ i * 3 + 1 ] = y;
+                            positions[ i * 3 + 2 ] = z;
+                            // colors
+                            colors[ i * 3 ] = ( x / r ) + 0.5;
+                            colors[ i * 3 + 1 ] = ( y / r ) + 0.5;
+                            colors[ i * 3 + 2 ] = ( z / r ) + 0.5;
+                        }
+                        */
+                        
+                        //positions[i] = 0;
+                        colors[i] = '0';
+                        colors[i * 3 + 1] = '8';
+                        colors[i * 3 + 2] = '0';
+                        colors[i * 3 + 3] = '8';
+                        colors[i * 3 + 4] = '0';
+                        colors[i * 3 + 5] = '8';
+                        
+                        
+                        lineVertices[i * 6] = 1;
+                        lineVertices[i * 6 + 1] = 1;
+                        lineVertices[i * 6 + 2] = 1;
+                        lineVertices[i * 6 + 3] = 2;
+                        lineVertices[i * 6 + 4] = 2;
+                        lineVertices[i * 6 + 5] = 2;
+                        
+                        /*
+                        lineVertices[i * 2] = new THREE.Vector3( 0,  10, 0 );
+                        lineVertices[i * 2 + 1] = new THREE.Vector3( 0,  0, 0 );
+                        
+                        
+                        geometry.vertices.push(
+                            new THREE.Vector3( 0,  10, 0 ),
+	                        new THREE.Vector3( 0, 0, 0 )
+                        )
+                        */
+                        //lineGeometry.addAttribute('position', new THREE.BufferAttribute(vertices, 3));
+                        
                         
                         var edgeLine = document.createElement('a-entity');
                         
@@ -842,12 +999,42 @@
                         edgeLine.setAttribute('cursor-listener', false);
                         edgeLine.setAttribute('class', "ignore-ray");
                         allEdges.push(edgeLine);
-                        document.querySelector('#structure').appendChild(edgeLine);
+                        //document.querySelector('#structure').appendChild(edgeLine);
                         
                         var nodeMoveAnimation = document.createElement('a-animation');
                         
                    
                     }
+                    
+                    geometry.addAttribute( 'position', new THREE.BufferAttribute( lineVertices, 3 ).setDynamic( true )  );
+                    geometry.addAttribute( 'color', new THREE.BufferAttribute( colors, 3 ) );
+                    geometry.computeBoundingSphere();
+                    mesh = new THREE.LineSegments( geometry, material );
+                    
+                    scene.add( mesh );
+                    
+                    console.dir(edges.length);
+                    
+                    
+                    
+                    //scene.add( points );
+                    
+                    /*
+                    geometry = new THREE.InstancedBufferGeometry();
+                    geometry.copy( new THREE.CircleBufferGeometry( 1, 6 ) );
+                    material = new THREE.RawShaderMaterial( {
+                        uniforms: {
+                            map: { value: new THREE.TextureLoader().load( "media/circle.png" ) },
+                            time: { value: 0.0 }
+                        },
+                        vertexShader: document.getElementById( 'vshader' ).textContent,
+                        fragmentShader: document.getElementById( 'fshader' ).textContent,
+                        depthTest: true,
+                        depthWrite: true
+                    } );
+                    */
+                    positions = new Float32Array( nodes.length * 3 );
+                    
                     
                     for(var i = 0; i < nodes.length; i++){
                         // get the current node
@@ -856,7 +1043,39 @@
                         var nodeID = node.getAttribute('id');
                         // get the current node's label
                         var nodeLabel = node.getAttribute('label');
+                        
+                        
+                        
 
+                        
+
+                        //var positions = new Float32Array( nodes.length * 3 );
+                            
+                        /*
+                        for ( var i = 0, i3 = 0, l = particleCount; i < l; i ++, i3 += 3 ) {
+
+                            translateArray[ i3 + 0 ] = Math.random() * 2 - 1;
+                            translateArray[ i3 + 1 ] = Math.random() * 2 - 1;
+                            translateArray[ i3 + 2 ] = Math.random() * 2 - 1;
+
+                        }
+                        */
+                        
+                        /*
+                        material = new THREE.RawShaderMaterial( {
+                            uniforms: {
+                                map: { value: new THREE.TextureLoader().load( "circle.png" ) },
+                                time: { value: 0.0 }
+                            },
+                            vertexShader: document.getElementById( 'vshader' ).textContent,
+                            fragmentShader: document.getElementById( 'fshader' ).textContent,
+                            depthTest: true,
+                            depthWrite: true
+                        } );
+                            */
+                        
+                        
+                        
                         /*
                         // get the current node's x position
                         var nodePositionX = node.querySelector('position').getAttribute('x');
@@ -886,6 +1105,10 @@
                         //nodePositions[i] = new THREE.Vector3((nodePositionX / 100), (nodePositionY / 100), randomZ);
                         nodePositions[i] = new THREE.Vector3(Math.random(), Math.random(), Math.random());
                         startPositions[i] = new THREE.Vector3(nodePositions[i].x, nodePositions.y, nodePositions.z);
+                        
+                        positions[i * 3] = Math.random();
+                        positions[i * 3 + 1] = Math.random();
+                        positions[i * 3 + 2] = Math.random();
                         
                         /*
                         // get the current node's size
@@ -951,9 +1174,33 @@
                         nodeSphere.setAttribute('isSelected', false);
                         nodeSphere.setAttribute('class', 'collidable')
                         allNodes.push(nodeSphere);
-                        document.querySelector('#structure').appendChild(nodeSphere);
+                        //document.querySelector('#structure').appendChild(nodeSphere);
 
                     }
+                    
+                    /*
+                    geometry.addAttribute( "position", new THREE.InstancedBufferAttribute( positions, 3, 1 ).setDynamic( true )  );
+                    geometry.addAttribute( 'color', new THREE.BufferAttribute( colors, 3 ) );
+                    nodeMesh = new THREE.Mesh( geometry, material );
+                    //nodeMesh.scale.set( 500, 500, 500 );
+                    scene.add( nodeMesh );
+                    */
+                    
+                    geometry = new THREE.BufferGeometry();
+            
+                    geometry.addAttribute( 'position', new THREE.BufferAttribute( positions, 3 ));
+                    geometry.addAttribute( 'color', new THREE.BufferAttribute( colors, 3 ) );
+                    material = new THREE.PointsMaterial( { size: 1, vertexColors: THREE.VertexColors } );
+
+                    nodeMesh = new THREE.Points( geometry, material );
+                    
+                    //nodeMesh.geometry.setAttribute('class', 'collidable')
+                    
+                    scene.add(nodeMesh);
+                    
+                    
+                    //nodeMesh.scale.set( 500, 500, 500 );
+                    
                     
                     for(var i = 0; i < allNodes.length; i++){
                         forceOnNode[i] = new THREE.Vector3(0, 0, 0);
@@ -965,7 +1212,7 @@
                     }
                     
                     update();
-                    //console.dir(neighborList);
+                    
                     
                     cursor.setAttribute('raycaster', {
                         objects: '.collidable'
@@ -998,7 +1245,7 @@
     
     <a-scene id="scene" stats antialias="true" >
 
-     <a-entity id="structure" position='0 0 -5'>
+     <a-entity id="structure" position='0 0 0'>
       
       </a-entity>
         

@@ -172,7 +172,7 @@
             var material = new THREE.PointsMaterial( { size: 1, vertexColors: THREE.VertexColors } );
 
 				points = new THREE.Points( geometry, material );
-				scene.add( points );
+				//scene.add( points );
             
             
             geometry = new THREE.InstancedBufferGeometry();
@@ -206,6 +206,46 @@
 			var mesh = new THREE.Mesh( geometry, material );
 			mesh.scale.set( 500, 500, 500 );
 			scene.add( mesh );
+            
+            
+            
+            
+            
+            
+            // Lines
+                var segments = 50;
+                geometry = new THREE.BufferGeometry();
+                material = new THREE.LineBasicMaterial({ vertexColors: THREE.VertexColors });
+                    
+                    				var positions = new Float32Array( segments * 3 );
+				colors = new Float32Array( segments * 6 );
+				//r = 800;
+				for ( var i = 0; i < segments; i ++ ) {
+					var x = Math.random() * r - r / 2;
+					var y = Math.random() * r - r / 2;
+					var z = Math.random() * r - r / 2;
+					// positions
+					positions[ i * 3 ] = x;
+					positions[ i * 3  + 1 ] = y;
+					positions[ i  * 3 + 2 ] = z;
+					// colors
+					colors[ i * 3 ] = ( x / r ) + 0.5;
+					colors[ i * 3 + 1 ] = ( y / r ) + 0.5;
+					colors[ i * 3 + 2 ] = ( z / r ) + 0.5;
+				}
+				geometry.addAttribute( 'position', new THREE.BufferAttribute( positions, 3 ) );
+				geometry.addAttribute( 'color', new THREE.BufferAttribute( colors, 3 ) );
+				geometry.computeBoundingSphere();
+				mesh = new THREE.LineSegments( geometry, material );
+            console.dir(mesh);
+				scene.add( mesh );
+            
+                var newSphere = document.createElement('a-sphere');
+                newSphere.setAttribute('position', "" + positions[0] + " " + positions[1] + " " + positions[2] + "");
+                ascene.appendChild(newSphere);
+                var newSphere = document.createElement('a-sphere');
+                newSphere.setAttribute('position', "" + positions[6] + " " + positions[7] + " " + positions[8] + "");
+                ascene.appendChild(newSphere);
             /*
 				geometry.addAttribute( 'position', new THREE.BufferAttribute( 10, 3 ).setDynamic( true ) );
 				geometry.addAttribute( 'color', new THREE.BufferAttribute( 100, 3 ).setDynamic( true ) );
@@ -260,11 +300,11 @@
     
     <a-scene id="scene" stats antialias='true'>
         
-      <a-camera id='camera' position = "0 0 20" fov='50'>
+      <a-camera id='camera' position = "0 0 50" fov='50'>
         <a-cursor></a-cursor>
       </a-camera>
         
-       <a-box id='box'></a-box>
+       
       <a-sky color="#ECECEC"></a-sky>
     </a-scene>
     
