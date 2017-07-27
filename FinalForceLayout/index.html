@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8"/>
+    <title>VR Graph/Network Data Visualization Application Prototype</title>
+    
+    <style>
+        
+    </style>
+    
+    <!-- import aFrame Library -->
+    <script src="https://aframe.io/releases/0.5.0/aframe.min.js"></script>
+    <script src="js/aframe-line-component.min.js"></script>
+    <script src="js/keys.js"></script>
+
+    <!-- Main Script -->
+    <script>
+
+        // IIFE
+        (function(){
+            'use strict';
+            
+            // Main Scene
+            var aScene, camera, cameraPosition, cameraSpeed;
+            
+            // Cursor and UI/menu
+            var cursor, entered, popUpInfo, popUpInfoPlane, popUpPosition, menu;
+            
+            // Graph/Network
+            var allNodes, allEdges, nodePositions, neighborList, forceOnNode;
+            
+            // For force layout algorithms
+            var layoutSpeed, nodeDisplacement, maxForce, minForce, meanForce, meanForceIndexTracker, percentForce, calculating;
+            // Force Constants
+            const springConstant = 8;
+            const coulombConstant = 8.99 * Math.pow(10,9);
+            const nodeCharge = 0.0001;
+            const springEquilibrium = 1;
+            
+            // Track time of calculations
+            var start, elapsed, steps, stepTime, averageStepTime;
+            
+            // Track rotation of structure
+            var rotateStructure;
+
+            // For keyboard input
+            var myKeys = {};
+            
+            myKeys.KEYBOARD = Object.freeze({
+                "KEY_e": 69,
+                "KEY_q": 81,
+                "KEY_LEFT": 37, 
+                "KEY_UP": 38, 
+                "KEY_RIGHT": 39, 
+                "KEY_DOWN": 40,
+                "KEY_SPACE": 32,
+                "KEY_SHIFT": 16,
+                "KEY_w": 87,
+                "KEY_a": 65,
+                "KEY_s": 83,
+                "KEY_d": 68,
+                "KEY_r": 82,
+                "KEY_c": 67,
+                "KEY_x": 88
+            })
+            
+            myKeys.keydown = [];
+
+            // Starter function
+            function init(){
+                // Instantiate all variables
+                aScene = document.querySelector("#scene");
+                camera = document.querySelector('#camera');
+                cameraPosition = new THREE.Vector3(camera.getAttribute('position').x, camera.getAttribute('position').y, camera.getAttribute('position').z);
+                cameraSpeed = new THREE.Vector3(0,0,0);
+                cursor = document.querySelector("#cursor");
+                
+                allNodes = [];
+                allEdges = [];
+                nodePositions = [];
+                neighborList = [];
+                forceOnNode = [];
+                
+                menu = document.querySelector('#menu');
+                popUpInfo = document.createElement('a-text');
+                popUpInfoPlane = document.createElement('a-plane');
+                popUpInfoPlane.setAttribute('opacity', 0.0);
+                popUpInfo.setAttribute('opacity', 0.0);
+                aScene.appendChild(popUpInfo);
+                aScene.appendChild(popUpInfoPlane);
+                entered = false;
+                popUpPosition = {
+                  x: 0,
+                  y: 0,
+                  z: 0
+                };
+                
+                rotateStructure = 0;
+                layoutSpeed = 1;
+                nodeDisplacement = 0;
+                maxForce = 0;
+                minForce = 0;
+                meanForce = 0;
+                meanForceIndexTracker = 1;
+                percentForce = 0;
+                calculating = true;
+                steps = 0;
+                stepTime = 0;
+                averageStepTime = 0;
+                
+
+                // For Event Listeners
+                window.addEventListener('keydown', checkKeyDown);  
+                window.addEventListener('keyup', checkKeyUp);   
+                
+                // Cursor Listeners, Click, Enter
+                AFRAME.registerComponent('cursor-listener', {
+                  
+                  init: function () {
+                    // Cursor Click
+                    this.el.addEventListener('click', function (event) {
+                      
+                      popUpInfoPlane.setAttribute('height', 0.25);
+                      popUpInfoPlane.setAttribute('width', 1.5);
+                      popUpInfoPlane.setAttribute('opacity', 1.0);
+                      popUpInfoPlane.setAttribute('position', '' + (cameraPosition.x - 1.5) + ' ' + (cameraPosition.y) + ' ' + (cameraPosition.z - 3.2) + '');
+                        
+                      popUpInfo.setAttribute('value', this.getAttribute('label'));
+                      popUpInfo.setAttribute('color', 'black');
+                      popUpInfo.setAttribute('height', '1');
+                      popUpInfo.setAttribute('width', '2');
+                      popUpInfo.setAttribute('opacity', 1.0);
+                      popUpInfo.setAttribute('position', '' + (cameraPosition.x - 1.55) + ' ' + (cameraPosition.y) + ' ' + (cameraPosition.z - 3.19) + '');
+                        
+                      var nodeText = this.getAttribute('label');
+                        entered = true;
+                        });
+                    
+                    // Cursor Hover
+                    this.el.addEventListener('mouseenter', function (event) {
+                    
+                      popUpPosition.x = event.detail.intersection.point.x;
+                      popUpPosition.y = event.detail.intersection.point.y;
+                      popUpPosition.z = event.detail.intersection.point.z;
+                        
+                      popUpInfoPlane.setAttribute('height', 0.25);
+                      popUpInfoPlane.setAttribute('width', 1.5);
+                      popUpInfoPlane.setAttribute('rotation', '0 0 0');
+                      popUpInfoPlane.setAttribute('opacity', 0.5);
+                      popUpInfoPlane.setAttribute('position', '' + (cameraPosition.x - 1.5) + ' ' + (cameraPosition.y) + ' ' + (cameraPosition.z - 3.2) + '');
+                        
+                      popUpInfo.setAttribute('value', this.getAttribute('label'));
+                      popUpInfo.setAttribute('color', 'black');
+                      popUpInfo.setAttribute('height', '1');
+                      popUpInfo.setAttribute('width', '2');
+                      popUpInfo.setAttribute('opacity', 0.5);
+                      popUpInfo.setAttribute('position', '' + (cameraPosition.x - 1.55) + ' ' + (cameraPosition.y) + ' ' + (cameraPosition.z - 3.19) + '')
+                        
+                      entered = false;
+                    
+                    });
+                      
+                    // Cursor Leave
+                    this.el.addEventListener('mouseleave', function (event) {
+                        
+                        if(entered == false){
+
+                          popUpInfoPlane.setAttribute('opacity', 0.0);
+                          popUpInfo.setAttribute('opacity', 0.0);
+                      }
+                      
+                    });
+                      
+                  }
+                });
+                
+                // Load in the graph/network data
+                loadData();
+                
+            }
+
+          function checkKeyDown(event){
+                myKeys.keydown[event.keyCode] = true;
+                var char = String.fromCharCode(event.keyCode); 
+            }
+          
+            function checkKeyUp(event){
+                myKeys.keydown[event.keyCode] = false;
+                var char = String.fromCharCode(event.keyCode);
+                
+            }
+
+            // Main update loop
+            function update(){
+                requestAnimationFrame(update);
+                
+                if(calculating == true){
+                    calcForce();
+                }
+                
+                var acceleration = new THREE.Vector3(0,0,0);
+                
+                if(myKeys.keydown[myKeys.KEYBOARD.KEY_w]){
+                    //acceleration = forward;
+                    acceleration = calcMovement(0);
+                }
+                if(myKeys.keydown[myKeys.KEYBOARD.KEY_a]){
+                    //acceleration = left;
+                    acceleration = calcMovement(1);
+                }
+                if(myKeys.keydown[myKeys.KEYBOARD.KEY_s]){
+                    //acceleration = backward;
+                    acceleration = calcMovement(2);
+                }
+                if(myKeys.keydown[myKeys.KEYBOARD.KEY_d]){
+                    //acceleration = right;
+                    acceleration = calcMovement(3);
+                }
+                
+                if(myKeys.keydown[myKeys.KEYBOARD.KEY_e]){
+                    cameraPosition.y += 0.25;
+                    camera.setAttribute('position', '' + cameraPosition.x + ' ' + cameraPosition.y + ' ' + cameraPosition.z + '');
+                }
+                if(myKeys.keydown[myKeys.KEYBOARD.KEY_q]){
+                    cameraPosition.y -= 0.25;
+                    camera.setAttribute('position', '' + cameraPosition.x + ' ' + cameraPosition.y + ' ' + cameraPosition.z + '');
+                }
+                
+                if (myKeys.keydown[myKeys.KEYBOARD.KEY_r] && myKeys.keydown[myKeys.KEYBOARD.KEY_SHIFT]){
+                    rotateStructure -= 0.5;
+                    document.querySelector("#structure").setAttribute('rotation', '0 ' + rotations + ' 0');
+                }
+                else if(myKeys.keydown[myKeys.KEYBOARD.KEY_r]){
+                    rotateStructure += 0.5;
+                    document.querySelector("#structure").setAttribute('rotation', '0 ' + rotations + ' 0');
+                }
+                if(myKeys.keydown[myKeys.KEYBOARD.KEY_SPACE]){
+                    //updateEdgeAnimation();
+                    cameraSpeed.multiplyScalar(0.5);
+                }
+                if(myKeys.keydown[myKeys.KEYBOARD.KEY_c]){
+                    calculating = true;
+                }
+                if(myKeys.keydown[myKeys.KEYBOARD.KEY_x]){
+                    calculating = false;
+                }
+                
+                acceleration.multiplyScalar(0.005);
+                cameraSpeed.add(acceleration);
+                
+                cameraPosition.add(cameraSpeed);
+                
+                camera.setAttribute('position', '' + cameraPosition.x + ' ' + cameraPosition.y + ' ' + cameraPosition.z + '');
+                
+                cameraSpeed.multiplyScalar(0.97);
+                
+                if(cameraSpeed.x < 0.001 && cameraSpeed.y < 0.001  && cameraSpeed.z < 0.001 && cameraSpeed.x > -0.001 && cameraSpeed.y > -0.001  && cameraSpeed.z > -0.001){
+                    cameraSpeed.multiplyScalar(0);
+                }
+
+            }
+            
+            // Calculate camera movement
+            function calcMovement(direction){
+                var cameraRotation = camera.getAttribute('rotation');
+                
+                var theta = cameraRotation.y;
+                var phi = cameraRotation.x;
+                
+                theta += 90;
+                
+                theta = theta * Math.PI / 180;
+                phi = phi * Math.PI / 180;
+                
+                theta *= -1;
+                
+                var xDist = Math.cos(theta);
+                var zDist = Math.sin(theta);
+                var yDist = Math.sin(phi);
+                
+                var forward = new THREE.Vector3(xDist, yDist, zDist);
+                var backward = new THREE.Vector3(-1, -1, -1);
+                var right = new THREE.Vector3(0, 0, 0);
+                var up = new THREE.Vector3(0, 1, 0);
+                var left = new THREE.Vector3(-1, -1, -1);
+                
+                backward.multiplyVectors(forward, backward);
+                right.crossVectors(forward, up);
+                left.multiplyVectors(right, left);
+                
+                if(direction == 0){ // Forward / 'w'
+                    forward.normalize();
+                    return forward;
+                }
+                else if(direction == 1){ // Left / 'a'
+                    left.normalize();
+                    return left;
+                }
+                else if(direction == 2){ // Backward / 's'
+                    backward.normalize();
+                    return backward;
+                }
+                else if(direction == 3){ // Right / 'd'
+                    right.normalize();
+                    return right;
+                }
+                else{
+                    var none = new THREE.Vector3(0,0,0);
+                    return none;
+                }
+ 
+            }
+         
+            // Calculate the forces acting on the nodes
+            function calcForce(){
+                start = new Date();
+
+                 // Calculate spring force for neighbor nodes (attractive)
+                for(var i = 0; i < allEdges.length; i++){
+                    
+                    
+                    var sourceNode = allEdges[i].getAttribute('source');
+                    var targetNode = allEdges[i].getAttribute('target');
+                    var edgeWeight = allEdges[i].getAttribute('weight');
+                    
+                    var distanceMag = nodePositions[sourceNode].distanceTo(nodePositions[targetNode]);
+                            
+                    //distanceMag -= springEquilibrium;
+
+                    var distanceVec = new THREE.Vector3(0, 0, 0);
+
+                    distanceVec.subVectors(nodePositions[targetNode], nodePositions[sourceNode]);
+                    
+                    var addVectors = new THREE.Vector3(0,0,0);
+                    
+                    addVectors.addVectors(nodePositions[targetNode], nodePositions[sourceNode]);
+                    
+                    addVectors.divideScalar(2);
+                    
+                    
+
+                    distanceVec.normalize();
+                    
+                    var springForce = distanceVec.multiplyScalar(springConstant *5 * (distanceMag - 1));
+
+                    forceOnNode[sourceNode].addVectors(forceOnNode[sourceNode], springForce);
+                    
+                    springForce.multiplyScalar(-1);
+                    
+                    forceOnNode[targetNode].addVectors(forceOnNode[targetNode], springForce);
+
+                }
+                
+             
+                for(var i = 0; i < allNodes.length; i++){
+                    
+                    // Calculate magnetic force for all nodes (repulsive)
+                    for(var j = 0; j < allNodes.length; j++){
+                        if(i != j){
+
+                            var distanceMag = nodePositions[j].distanceTo(nodePositions[i]);
+
+                            if(distanceMag < 35){
+                                var distanceVec = new THREE.Vector3(0, 0, 0);
+
+                                distanceVec.subVectors(nodePositions[j], nodePositions[i]);
+
+                                distanceVec.normalize();
+
+                                var magneticForce = distanceVec.multiplyScalar(-coulombConstant * ((nodeCharge * nodeCharge) / (distanceMag * distanceMag)));
+
+                                forceOnNode[i].addVectors(forceOnNode[i], magneticForce); 
+                            }
+                        
+                        }
+                    }
+                    
+                }
+                 
+                applyForce();
+            }
+            
+            
+            // Apply the calculated forces to the nodes
+            function applyForce(){
+
+                for(var i = 0; i < allNodes.length; i++){
+
+                    nodeDisplacement += forceOnNode[i].length();
+                    
+                    forceOnNode[i].normalize();
+                    forceOnNode[i].divideScalar(layoutSpeed);
+                    nodePositions[i].addVectors(nodePositions[i],  forceOnNode[i]);
+
+                    
+                    var distanceMag = forceOnNode[i].length();
+
+                }
+
+                meanForce += nodeDisplacement;
+                
+                var average = meanForce / meanForceIndexTracker;
+                
+                meanForceIndexTracker += 1;
+
+                if(nodeDisplacement > maxForce){
+                    maxForce = nodeDisplacement;
+                    minForce = nodeDisplacement;
+                }
+                if(nodeDisplacement < minForce){
+                    minForce = nodeDisplacement;
+                }
+
+                percentForce = ((maxForce - average) / maxForce) * 100;
+                
+                
+                if(percentForce > 99.8){
+                    calculating = false;
+                    
+                }
+                
+                layoutSpeed = (steps * 2) / 100;
+
+                nodeDisplacement = 0;
+                
+                elapsed = new Date() - start;
+                
+                steps += 1;
+                
+                stepTime += elapsed;
+                
+                if(steps % 10 == 0){
+                    updatePosition();
+                }
+                
+                if(calculating == false){
+                    updatePosition();
+                    console.log("steps: " + steps);
+                    averageStepTime = stepTime / steps;
+                    console.log("averageStepTime(ms): " + averageStepTime);
+               }
+               
+            }
+            
+            // Update the nodes and edges positions based on the applied forces
+            function updatePosition(){
+                
+                for(var i = 0; i < allNodes.length; i++){
+                    allNodes[i].setAttribute('position', '' + nodePositions[i].x + ' ' + nodePositions[i].y + ' ' + nodePositions[i].z);
+                }
+                
+                for(var i = 0; i < allEdges.length; i++){
+                    allEdges[i].setAttribute('line', {
+                            start: '' + nodePositions[allEdges[i].getAttribute('source')].x + ' ' + nodePositions[allEdges[i].getAttribute('source')].y + ' ' + nodePositions[allEdges[i].getAttribute('source')].z + '',
+                            end: '' + nodePositions[allEdges[i].getAttribute('target')].x + ' ' + nodePositions[allEdges[i].getAttribute('target')].y + ' ' + nodePositions[allEdges[i].getAttribute('target')].z + '',
+                        });   
+                }
+            }
+
+            // Load data from xml file
+            function loadData(){
+                var xhr = new XMLHttpRequest();
+
+                // Once XML Request has loaded
+                xhr.onload = function(){
+                    
+                    // Store xml response in variable
+                    var xml = xhr.responseXML;
+                    
+                    // get nodes and edges from xml
+                    var nodes = xml.querySelectorAll('node');
+
+                    var edges = xml.querySelectorAll('edge');
+                 
+                    // Define neighborList indices as arrays
+                    for(var i = 0; i < edges.length + 1; i++){
+                        neighborList[i] = [];
+                    }
+                   
+                   
+                    // Loop through all edges
+                    // Get all edge attributes
+                    for(var i = 0; i < edges.length; i++){
+                        // get current edge
+                        var edge = edges[i];
+                        // get current edge's id
+                        var edgeID = edge.getAttribute('id');
+                        // get current edge's source
+                        var edgeSource = edge.getAttribute('source');
+                        // get current edge's target
+                        var edgeTarget = edge.getAttribute('target');
+                        
+                        var pearson = edge.getAttribute('Rp');
+
+                        neighborList[Math.floor(edgeSource)].push(Math.floor(edgeTarget));
+                        neighborList[Math.floor(edgeTarget)].push(Math.floor(edgeSource));
+
+                        var edgeLine = document.createElement('a-entity');
+                        
+                        edgeLine.setAttribute('source', Math.floor(edgeSource));
+                        edgeLine.setAttribute('target', Math.floor(edgeTarget));
+                        
+                        
+                        
+                        if(pearson > 0.7){
+                            edgeLine.setAttribute('line', {
+                                color: '#0F0',
+                            });
+                        }
+                        else{
+                            edgeLine.setAttribute('line', {
+                                color: '#FFF',
+                                opacity: 0.35
+                            });
+                        }
+
+                        edgeLine.setAttribute('weight', (pearson));
+                        edgeLine.setAttribute('cursor-listener', false);
+                        edgeLine.setAttribute('class', "ignore-ray");
+                        allEdges.push(edgeLine);
+                        document.querySelector('#structure').appendChild(edgeLine);
+
+                    }
+                 
+                    
+                    // Loop through all nodes
+                    // Get all node attributes
+                    // Create sphere for node's position and size
+                    // Create text for label
+                    for(var i = 0; i < nodes.length; i++){
+                        // get the current node
+                        var node = nodes[i];
+                        // get the current node's id
+                        var nodeID = node.getAttribute('id');
+                        // get the current node's label
+                        var nodeLabel = node.getAttribute('label');
+                        
+                       
+                        nodePositions[i] = new THREE.Vector3(Math.random(), Math.random(), Math.random());
+                        
+                        // create sphere for node
+                        var nodeSphere = document.createElement('a-entity');
+                        nodeSphere.setAttribute('geometry', {
+                            primitive: 'sphere',
+                            radius: ((Math.log(neighborList[i].length) + 1) / 5),
+                            buffer: true
+                        });
+                       
+                        nodeSphere.setAttribute('position', {
+                            x: nodePositions[i].z,
+                            y: nodePositions[i].y,
+                            z: nodePositions[i].z
+                        })
+                        
+                        nodeSphere.setAttribute('material', {
+                            color: 'rgb(' + (neighborList[i].length * 10) + ',' + 0 + ',' + 0 +')',
+                            normalMap: 'media/normalMap2.png',
+                            metalness: '0.0',
+                            //opacity: (neighborList[i].length / 100) + 0.2
+                        });
+                        
+                        nodeSphere.setAttribute('cursor-listener', true);
+                        nodeSphere.setAttribute('label', nodeLabel);
+                        nodeSphere.setAttribute('nodeID', nodeID);
+                        nodeSphere.setAttribute('isSelected', false);
+                        nodeSphere.setAttribute('class', 'collidable')
+                        allNodes.push(nodeSphere);
+                        document.querySelector('#structure').appendChild(nodeSphere);
+
+                    }
+
+                    for(var i = 0; i < allNodes.length; i++){
+                        forceOnNode[i] = new THREE.Vector3(0, 0, 0);
+                     }
+
+                    
+                    update();
+                    
+                    
+                    cursor.setAttribute('raycaster', {
+                        objects: '.collidable'
+                    });
+                    
+                }
+
+                // store the path to the data file
+                var path = "data/testGraph.xml";
+
+                // open the xml request
+                xhr.open('GET', path, true);
+                // set request header
+                xhr.setRequestHeader("If-Modified-Since", "Sat, 1 Jan 2010 00:00:00 GMT");
+                // send the request
+                xhr.send();
+
+            }
+
+            // Load init when page has loaded
+            window.onload = init;
+            
+        }());
+
+    </script>
+    
+</head>
+
+<body>
+    
+    <a-scene id="scene" stats antialias="true" >
+
+     <a-entity id="structure" position='0 0 0'>
+      
+      </a-entity>
+        
+        <a-entity id="menu" position='0 0 0' rotation="0 20 0">
+      
+            </a-entity>
+        
+        <a-camera id='camera' fov='50' near="0.5" position="0 0 50" reverse-mouse-drag='false' wasd-controls='enabled: false'>
+            
+            <a-entity id="cursor" cursor="fuse: true"
+              raycaster="far: 100; interval: 1000"
+              scale='0.02 0.02 0.02'
+              position='0 0 -1.5'
+              geometry="primitive: ring"
+              class='ignore-ray'
+              material="color: white">
+              
+              <a-animation begin="click" easing="ease-in" attribute="scale"
+                     fill="backwards" from="0.05 0.05 0.05" to="0.02 0.02 0.02" dur="500"></a-animation>
+              
+            
+            <a-animation begin="cursor-fusing" easing="ease-in" attribute="material.color"
+                           fill="forwards" from="white" to="#00FF00" dur="1500"></a-animation>
+            
+            <a-animation begin="click" easing="ease-in" attribute="material.color"
+                           fill="forwards" from="#00FF00" to="white" dur="500"></a-animation>
+              
+            </a-entity>
+            
+        </a-camera>
+
+      <a-sky color="black" class='ignore-ray' cursor-listener='false'></a-sky>
+      <a-plane color="tan" height="200" width="200" position="0 -100 0" rotation="-90 0 0"></a-plane>
+      <a-box color="gray" height="250" width="200" depth="200" scale="-1 1 1"></a-box>
+        
+    </a-scene>
+    
+</body>
+
+</html>
