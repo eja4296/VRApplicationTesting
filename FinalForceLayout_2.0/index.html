@@ -18,10 +18,10 @@
             'use strict';
             
             // Main Scene
-            var aScene, camera, cameraPosition, cameraSpeed;
+            var aScene, camera, userPosition, cameraSpeed;
             
             // Cursor and UI/menu
-            var cursor, entered, popUpInfo, popUpInfoPlane, popUpPosition;
+            var cursor, entered, popUpInfo, popUpInfoPlane, popUpPosition, menu, user;
             
             // Graph/Network
             var allNodes, allEdges, nodePositions, neighborList, forceOnNode;
@@ -38,7 +38,7 @@
             var start, elapsed, steps, stepTime, averageStepTime;
             
             // Track rotation of structure
-            var rotateStructure;
+            var rotateStructure, rotateSpeed;
 
             // For keyboard input
             var myKeys = {};
@@ -68,9 +68,11 @@
                 // Instantiate all variables
                 aScene = document.querySelector("#scene");
                 camera = document.querySelector('#camera');
-                cameraPosition = new THREE.Vector3(camera.getAttribute('position').x, camera.getAttribute('position').y, camera.getAttribute('position').z);
+                user = document.querySelector('#user');
+                userPosition = new THREE.Vector3(user.getAttribute('position').x, user.getAttribute('position').y, user.getAttribute('position').z);
                 cameraSpeed = new THREE.Vector3(0,0,0);
                 cursor = document.querySelector("#cursor");
+                menu = document.querySelector('#menu');
                 
                 allNodes = [];
                 allEdges = [];
@@ -82,8 +84,8 @@
                 popUpInfoPlane = document.createElement('a-plane');
                 popUpInfoPlane.setAttribute('opacity', 0.0);
                 popUpInfo.setAttribute('opacity', 0.0);
-                aScene.appendChild(popUpInfo);
-                aScene.appendChild(popUpInfoPlane);
+                menu.appendChild(popUpInfo);
+                menu.appendChild(popUpInfoPlane);
                 entered = false;
                 popUpPosition = {
                   x: 0,
@@ -92,6 +94,7 @@
                 };
                 
                 rotateStructure = 0;
+                rotateSpeed = 0;
                 layoutSpeed = 1;
                 nodeDisplacement = 0;
                 maxForce = 0;
@@ -118,15 +121,15 @@
                       popUpInfoPlane.setAttribute('height', 0.25);
                       popUpInfoPlane.setAttribute('width', 1.5);
                       popUpInfoPlane.setAttribute('opacity', 0.8);
-                      popUpInfoPlane.setAttribute('position', '' + (cameraPosition.x - 1.5) + ' ' + (cameraPosition.y) + ' ' + (cameraPosition.z - 3.2) + '');
+                      popUpInfoPlane.setAttribute('position', '' + (0) + ' ' + (1) + ' ' + (-3.2) + '');
                         
                       popUpInfo.setAttribute('value', this.getAttribute('label'));
                       popUpInfo.setAttribute('color', 'black');
                       popUpInfo.setAttribute('height', '1');
                       popUpInfo.setAttribute('width', '2');
                       popUpInfo.setAttribute('opacity', 0.8);
-                      popUpInfo.setAttribute('position', '' + (cameraPosition.x - 1.55) + ' ' + (cameraPosition.y) + ' ' + (cameraPosition.z - 3.19) + '');
-                        
+                      popUpInfo.setAttribute('position', '' + (0) + ' ' + (1) + ' ' + (-3.19) + '');
+                        console.dir(userPosition);
                       var nodeText = this.getAttribute('label');
                         entered = true;
                         });
@@ -142,15 +145,15 @@
                       popUpInfoPlane.setAttribute('width', 1.5);
                       popUpInfoPlane.setAttribute('rotation', '0 0 0');
                       popUpInfoPlane.setAttribute('opacity', 0.5);
-                      popUpInfoPlane.setAttribute('position', '' + (cameraPosition.x - 1.5) + ' ' + (cameraPosition.y) + ' ' + (cameraPosition.z - 3.2) + '');
+                      popUpInfoPlane.setAttribute('position', '' + (0) + ' ' + (1) + ' ' + (-3.2) + '');
                         
                       popUpInfo.setAttribute('value', this.getAttribute('label'));
                       popUpInfo.setAttribute('color', 'black');
                       popUpInfo.setAttribute('height', '1');
                       popUpInfo.setAttribute('width', '2');
                       popUpInfo.setAttribute('opacity', 0.5);
-                      popUpInfo.setAttribute('position', '' + (cameraPosition.x - 1.55) + ' ' + (cameraPosition.y) + ' ' + (cameraPosition.z - 3.19) + '')
-                        
+                      popUpInfo.setAttribute('position', '' + (0) + ' ' + (1) + ' ' + (-3.19) + '')
+                    
                       entered = false;
                     
                     });
@@ -169,7 +172,6 @@
                 
                 // Load in the graph/network data
                 loadData();
-                
             }
             
             // Key down event
@@ -182,7 +184,6 @@
             function checkKeyUp(event){
                 myKeys.keydown[event.keyCode] = false;
                 var char = String.fromCharCode(event.keyCode);
-                
             }
 
             // Main update loop
@@ -212,24 +213,26 @@
                 }
                 
                 if(myKeys.keydown[myKeys.KEYBOARD.KEY_e]){
-                    cameraPosition.y += 0.25;
-                    camera.setAttribute('position', '' + cameraPosition.x + ' ' + cameraPosition.y + ' ' + cameraPosition.z + '');
+                    userPosition.y += 0.25;
+                    user.setAttribute('position', '' + userPosition.x + ' ' + userPosition.y + ' ' + userPosition.z + '');
                 }
                 if(myKeys.keydown[myKeys.KEYBOARD.KEY_q]){
-                    cameraPosition.y -= 0.25;
-                    camera.setAttribute('position', '' + cameraPosition.x + ' ' + cameraPosition.y + ' ' + cameraPosition.z + '');
+                    userPosition.y -= 0.25;
+                    user.setAttribute('position', '' + userPosition.x + ' ' + userPosition.y + ' ' + userPosition.z + '');
                 }
                 if(myKeys.keydown[myKeys.KEYBOARD.KEY_SPACE]){
                     cameraSpeed.multiplyScalar(0.5);
                 }
                 
                 if (myKeys.keydown[myKeys.KEYBOARD.KEY_r] && myKeys.keydown[myKeys.KEYBOARD.KEY_SHIFT]){
-                    rotateStructure -= 0.5;
-                    document.querySelector("#structure").setAttribute('rotation', '0 ' + rotations + ' 0');
+                    rotateSpeed -= 0.05;
+                    //rotateStructure += rotateSpeed;
+                    //document.querySelector("#structure").setAttribute('rotation', '0 ' + rotateStructure + ' 0');
                 }
                 else if(myKeys.keydown[myKeys.KEYBOARD.KEY_r]){
-                    rotateStructure += 0.5;
-                    document.querySelector("#structure").setAttribute('rotation', '0 ' + rotations + ' 0');
+                    rotateSpeed += 0.05;
+                    //rotateStructure += rotateSpeed;
+                    //document.querySelector("#structure").setAttribute('rotation', '0 ' + rotateStructure + ' 0');
                 }
                 
                 if(myKeys.keydown[myKeys.KEYBOARD.KEY_c]){
@@ -242,10 +245,19 @@
                 // Update camera position
                 acceleration.multiplyScalar(0.005);
                 cameraSpeed.add(acceleration);
-                cameraPosition.add(cameraSpeed);
-                camera.setAttribute('position', '' + cameraPosition.x + ' ' + cameraPosition.y + ' ' + cameraPosition.z + '');
+                userPosition.add(cameraSpeed);
+                user.setAttribute('position', '' + userPosition.x + ' ' + userPosition.y + ' ' + userPosition.z + '');
                 cameraSpeed.multiplyScalar(0.97);
                 
+                if(rotateSpeed > 1){
+                    rotateSpeed = 1;
+                }
+                rotateStructure += rotateSpeed;
+                document.querySelector("#structure").setAttribute('rotation', '0 ' + rotateStructure + ' 0');
+                rotateSpeed *= 0.96;
+                if (rotateSpeed < 0.001 && camera > -0.001){
+                    rotateSpeed = 0;
+                }
                 // Stop camera movement if really slow
                 if(cameraSpeed.x < 0.001 && cameraSpeed.y < 0.001  && cameraSpeed.z < 0.001 && cameraSpeed.x > -0.001 && cameraSpeed.y > -0.001  && cameraSpeed.z > -0.001){
                     cameraSpeed.multiplyScalar(0);
@@ -407,7 +419,6 @@
                     averageStepTime = stepTime / steps;
                     console.log("averageStepTime(ms): " + averageStepTime);
                }
-               
             }
             
             // Update the nodes and edges positions based on the applied forces
@@ -553,35 +564,44 @@
 
 <body>
     <!-- Aframe Scene -->
-    <a-scene id="scene" stats antialias="true" >
+    <a-scene id="scene" antialias="true" >
 
      <!-- Entity to hold graph structure -->
      <a-entity id="structure" position='0 0 0'>
       </a-entity>
 
-        <!-- User camera and cursor with click animations -->
-        <a-camera id='camera' fov='50' near="0.5" position="0 0 50" reverse-mouse-drag='false' wasd-controls='enabled: false'>
+        <!-- Entity for user, holds camera and menu -->
+        <a-entity id='user' position="0 0 50">
             
-            <a-entity id="cursor" cursor="fuse: true"
-              raycaster="far: 100; interval: 1000"
-              scale='0.02 0.02 0.02'
-              position='0 0 -1.5'
-              geometry="primitive: ring"
-              class='ignore-ray'
-              material="color: white">
-              
-            <a-animation begin="click" easing="ease-in" attribute="scale"
-                     fill="backwards" from="0.05 0.05 0.05" to="0.02 0.02 0.02" dur="500"></a-animation>
-              
-            <a-animation begin="cursor-fusing" easing="ease-in" attribute="material.color"
-                           fill="forwards" from="white" to="#00FF00" dur="1500"></a-animation>
-            
-            <a-animation begin="click" easing="ease-in" attribute="material.color"
-                           fill="forwards" from="#00FF00" to="white" dur="500"></a-animation>
-              
+            <!-- UI/menu -->
+            <a-entity id='menu' rotation='0 25 0'>
             </a-entity>
+        
+            <!-- User camera and cursor with click animations -->
+            <a-camera id='camera' fov='50' near="0.5"  reverse-mouse-drag='false' wasd-controls='enabled: false'>
+
+                <a-entity id="cursor" cursor="fuse: true"
+                  raycaster="far: 100; interval: 1000"
+                  scale='0.02 0.02 0.02'
+                  position='0 0 -1.5'
+                  geometry="primitive: ring"
+                  class='ignore-ray'
+                  material="color: white">
+
+                <a-animation begin="click" easing="ease-in" attribute="scale"
+                         fill="backwards" from="0.05 0.05 0.05" to="0.02 0.02 0.02" dur="500"></a-animation>
+
+                <a-animation begin="cursor-fusing" easing="ease-in" attribute="material.color"
+                               fill="forwards" from="white" to="#00FF00" dur="1500"></a-animation>
+
+                <a-animation begin="click" easing="ease-in" attribute="material.color"
+                               fill="forwards" from="#00FF00" to="white" dur="500"></a-animation>
+
+                </a-entity>
+
+            </a-camera>
             
-        </a-camera>
+        </a-entity>
 
       <a-sky color="black" class='ignore-ray' cursor-listener='false'></a-sky>
       <a-plane color="tan" height="200" width="200" position="0 -100 0" rotation="-90 0 0"></a-plane>

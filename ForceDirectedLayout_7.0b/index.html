@@ -15,51 +15,33 @@
     <script src="js/keys.js"></script>
 
     
-        		<script id="vshader" type="x-shader/x-vertex">
-		precision highp float;
-		uniform mat4 modelViewMatrix;
-		uniform mat4 projectionMatrix;
-		uniform float time;
-		attribute vec3 position;
-		attribute vec2 uv;
-		attribute vec3 translate;
-		varying vec2 vUv;
-		varying float vScale;
-		void main() {
-			vec4 mvPosition = modelViewMatrix * vec4( translate, 1.0 );
-			vec3 trTime = vec3(translate.x + time,translate.y + time,translate.z + time);
-			float scale =  sin( trTime.x * 2.1 ) + sin( trTime.y * 3.2 ) + sin( trTime.z * 4.3 );
-			vScale = scale;
-			scale = 1.0;
-			mvPosition.xyz += position * scale;
-			vUv = uv;
-			gl_Position = projectionMatrix * mvPosition;
-		}
-	</script>
-	<script id="fshader" type="x-shader/x-fragment">
-		precision highp float;
-		uniform sampler2D map;
-		varying vec2 vUv;
-		varying float vScale;
-		// HSL to RGB Convertion helpers
-		vec3 HUEtoRGB(float H){
-			H = mod(H,1.0);
-			float R = abs(H * 6.0 - 3.0) - 1.0;
-			float G = 2.0 - abs(H * 6.0 - 2.0);
-			float B = 2.0 - abs(H * 6.0 - 4.0);
-			return clamp(vec3(R,G,B),0.0,1.0);
-		}
-		vec3 HSLtoRGB(vec3 HSL){
-			vec3 RGB = HUEtoRGB(HSL.x);
-			float C = (1.0 - abs(2.0 * HSL.z - 1.0)) * HSL.y;
-			return (RGB - 0.5) * C + HSL.z;
-		}
-		void main() {
-			vec4 diffuseColor = texture2D( map, vUv );
-			gl_FragColor = vec4( diffuseColor.xyz * HSLtoRGB(vec3(vScale/5.0, 1.0, 0.5)), diffuseColor.w );
-			if ( diffuseColor.w < 0.5 ) discard;
-		}
-	</script>
+        <script type="x-shader/x-vertex" id="vertexshader">
+			attribute float size;
+			attribute vec4 ca;
+			varying vec4 vColor;
+			void main() {
+				vColor = ca;
+				vec4 mvPosition = modelViewMatrix * vec4( position, 1.0 );
+				gl_PointSize = size * ( 150.0 / -mvPosition.z );
+				gl_Position = projectionMatrix * mvPosition;
+			}
+		</script>
+
+		<script type="x-shader/x-fragment" id="fragmentshader">
+			uniform vec3 color;
+			uniform sampler2D texture;
+			varying vec4 vColor;
+			void main() {
+				vec4 outColor = texture2D( texture, gl_PointCoord );
+				if ( outColor.a < 0.5 ) discard;
+				gl_FragColor = outColor * vec4( color * vColor.xyz, 1.0 );
+				float depth = gl_FragCoord.z / gl_FragCoord.w;
+				const vec3 fogColor = vec3( 0.0 );
+				float fogFactor = smoothstep( 200.0, 600.0, depth );
+				gl_FragColor = mix( gl_FragColor, vec4( fogColor, gl_FragColor.w ), fogFactor );
+			}
+		</script>
+
     
     
     <!-- Main Script -->
@@ -329,41 +311,85 @@
                 var char = String.fromCharCode(event.keyCode);
                 
             }
-
             
-            // Main update loop
             function update(){
                 requestAnimationFrame(update);
                 
                 if(calculating == true){
                     calcForce();
-
                 }
                 
+                                
                 renderer.render(scene, camera3);
                 mesh.geometry.attributes.position.needsUpdate = true;
-                nodeMesh.geometry.attributes.translate.needsUpdate = true;
+                nodeMesh.geometry.attributes.position.needsUpdate = true;
                 
+                var acceleration = new THREE.Vector3(0,0,0);
                 
-                /*
-                else{
-                    edgeTimer += 1;
+                if(myKeys.keydown[myKeys.KEYBOARD.KEY_w]){
+                    acceleration = calcMovement(0);
+                }
+                if(myKeys.keydown[myKeys.KEYBOARD.KEY_a]){
+                    acceleration = calcMovement(1);
+                }
+                if(myKeys.keydown[myKeys.KEYBOARD.KEY_s]){
+                    acceleration = calcMovement(2);
+                }
+                if(myKeys.keydown[myKeys.KEYBOARD.KEY_d]){
+                    acceleration = calcMovement(3);
                 }
                 
-                if(edgeTimer == 150){
-                    updatePosition();
-                    //updateEdgeAnimation();
+                if(myKeys.keydown[myKeys.KEYBOARD.KEY_e]){
+                    cameraPosition.y += 0.25;
+                    camera.setAttribute('position', '' + cameraPosition.x + ' ' + cameraPosition.y + ' ' + cameraPosition.z + '');
                 }
-                */
+                if(myKeys.keydown[myKeys.KEYBOARD.KEY_q]){
+                    cameraPosition.y -= 0.25;
+                    camera.setAttribute('position', '' + cameraPosition.x + ' ' + cameraPosition.y + ' ' + cameraPosition.z + '');
+                }
+                if(myKeys.keydown[myKeys.KEYBOARD.KEY_SPACE]){
+                    cameraSpeed.multiplyScalar(0.5);
+                }
                 
+                if (myKeys.keydown[myKeys.KEYBOARD.KEY_r] && myKeys.keydown[myKeys.KEYBOARD.KEY_SHIFT]){
+                    rotateStructure -= 0.5;
+                    document.querySelector("#structure").setAttribute('rotation', '0 ' + rotations + ' 0');
+                }
+                else if(myKeys.keydown[myKeys.KEYBOARD.KEY_r]){
+                    rotateStructure += 0.5;
+                    document.querySelector("#structure").setAttribute('rotation', '0 ' + rotations + ' 0');
+                }
+                
+                if(myKeys.keydown[myKeys.KEYBOARD.KEY_c]){
+                    calculating = true;
+                }
+                if(myKeys.keydown[myKeys.KEYBOARD.KEY_x]){
+                    calculating = false;
+                }
+                
+                acceleration.multiplyScalar(0.005);
+                cameraSpeed.add(acceleration);
+                
+                cameraPosition.add(cameraSpeed);
+                
+                camera.setAttribute('position', '' + cameraPosition.x + ' ' + cameraPosition.y + ' ' + cameraPosition.z + '');
+                
+                cameraSpeed.multiplyScalar(0.97);
+                
+                if(cameraSpeed.x < 0.001 && cameraSpeed.y < 0.001  && cameraSpeed.z < 0.001 && cameraSpeed.x > -0.001 && cameraSpeed.y > -0.001  && cameraSpeed.z > -0.001){
+                    cameraSpeed.multiplyScalar(0);
+                }
+
+            }
+            
+            // Calculate camera movement
+            function calcMovement(direction){
                 var cameraRotation = camera.getAttribute('rotation');
                 
                 var theta = cameraRotation.y;
                 var phi = cameraRotation.x;
-                //console.dir(camera.getAttribute('rotation'));
                 
                 theta += 90;
-
                 
                 theta = theta * Math.PI / 180;
                 phi = phi * Math.PI / 180;
@@ -374,126 +400,40 @@
                 var zDist = Math.sin(theta);
                 var yDist = Math.sin(phi);
                 
-                var acceleration = new THREE.Vector3(0,0,0);
                 var forward = new THREE.Vector3(xDist, yDist, zDist);
-                
-                forward.normalize();
-                
+                var backward = new THREE.Vector3(-1, -1, -1);
                 var right = new THREE.Vector3(0, 0, 0);
                 var up = new THREE.Vector3(0, 1, 0);
-                
-                right.crossVectors(forward, up);
-                
                 var left = new THREE.Vector3(-1, -1, -1);
+                
+                backward.multiplyVectors(forward, backward);
+                right.crossVectors(forward, up);
                 left.multiplyVectors(right, left);
                 
-                var backward = new THREE.Vector3(-1, -1, -1);
-                backward.multiplyVectors(forward, backward);
-
-
-                if(myKeys.keydown[myKeys.KEYBOARD.KEY_e]){
-                    console.log('e');
+                if(direction == 0){ // Forward / 'w'
+                    forward.normalize();
+                    return forward;
                 }
-                
-                if(myKeys.keydown[myKeys.KEYBOARD.KEY_w]){
-                    /*
-                    if(cameraSpeed < cameraMaxSpeed){
-                        cameraSpeed += 0.01;
-                        forward.multiplyScalar(cameraSpeed);
-                    }
-                    */
-                    acceleration = forward;
-                    //cameraPosition.add(forward);
-                    //camera.setAttribute('position', '' + cameraPosition.x + ' ' + cameraPosition.y + ' ' + cameraPosition.z + '');
+                else if(direction == 1){ // Left / 'a'
+                    left.normalize();
+                    return left;
                 }
-                if(myKeys.keydown[myKeys.KEYBOARD.KEY_a]){
-                    /*
-                    if(cameraSpeed < cameraMaxSpeed){
-                        cameraSpeed += 0.01;
-                        forward.multiplyScalar(cameraSpeed);
-                    }
-                    */
-                    //cameraPosition.add(left);
-                    acceleration = left;
-                    //camera.setAttribute('position', '' + cameraPosition.x + ' ' + cameraPosition.y + ' ' + cameraPosition.z + '');
+                else if(direction == 2){ // Backward / 's'
+                    backward.normalize();
+                    return backward;
                 }
-                if(myKeys.keydown[myKeys.KEYBOARD.KEY_s]){
-                    /*
-                    if(cameraSpeed < cameraMaxSpeed){
-                        cameraSpeed += 0.01;
-                        forward.multiplyScalar(cameraSpeed);
-                    }
-                    */
-                    //cameraPosition.add(backward);
-                    acceleration = backward;
-                    //camera.setAttribute('position', '' + cameraPosition.x + ' ' + cameraPosition.y + ' ' + cameraPosition.z + '');
+                else if(direction == 3){ // Right / 'd'
+                    right.normalize();
+                    return right;
                 }
-                if(myKeys.keydown[myKeys.KEYBOARD.KEY_d]){
-                    /*
-                    if(cameraSpeed < cameraMaxSpeed){
-                        cameraSpeed += 0.01;
-                        forward.multiplyScalar(cameraSpeed);
-                    }
-                    */
-                    //cameraPosition.add(right);
-                    acceleration = right;
-                    //camera.setAttribute('position', '' + cameraPosition.x + ' ' + cameraPosition.y + ' ' + cameraPosition.z + '');
+                else{
+                    var none = new THREE.Vectob3(0,0,0);
+                    return none;
                 }
-                if(myKeys.keydown[myKeys.KEYBOARD.KEY_e]){
-                    cameraPosition.y += 0.25;
-                    camera.setAttribute('position', '' + cameraPosition.x + ' ' + cameraPosition.y + ' ' + cameraPosition.z + '');
-                }
-                if(myKeys.keydown[myKeys.KEYBOARD.KEY_q]){
-                    cameraPosition.y -= 0.25;
-                    camera.setAttribute('position', '' + cameraPosition.x + ' ' + cameraPosition.y + ' ' + cameraPosition.z + '');
-                }
-                
-                if (myKeys.keydown[myKeys.KEYBOARD.KEY_r] && myKeys.keydown[myKeys.KEYBOARD.KEY_SHIFT]){
-                    rotations -= 0.5;
-                    document.querySelector("#structure").setAttribute('rotation', '0 ' + rotations + ' 0');
-                }
-                else if(myKeys.keydown[myKeys.KEYBOARD.KEY_r]){
-                    rotations += 0.5;
-                    document.querySelector("#structure").setAttribute('rotation', '0 ' + rotations + ' 0');
-                }
-                if(myKeys.keydown[myKeys.KEYBOARD.KEY_SPACE]){
-                    //edgeAnimation = true;
-                    //updateEdgeAnimation();
-                    cameraSpeed.multiplyScalar(0.5);
-                    secondForce();
-                }
-                if(myKeys.keydown[myKeys.KEYBOARD.KEY_c]){
-                    
-                    calculating = true;
-                }
-                if(myKeys.keydown[myKeys.KEYBOARD.KEY_x]){
-                    
-                    calculating = false;
-                    
-                }
-                
-                acceleration.multiplyScalar(0.005);
-                cameraSpeed.add(acceleration);
-                
-                
-                cameraPosition.add(cameraSpeed);
-                
-                camera.setAttribute('position', '' + cameraPosition.x + ' ' + cameraPosition.y + ' ' + cameraPosition.z + '');
-                
-                
-                cameraSpeed.multiplyScalar(0.97);
-                
-                if(cameraSpeed.x < 0.001 && cameraSpeed.y < 0.001  && cameraSpeed.z < 0.001 && cameraSpeed.x > -0.001 && cameraSpeed.y > -0.001  && cameraSpeed.z > -0.001){
-                    cameraSpeed.multiplyScalar(0);
-                }
-                
-                //console.log(camera.getAttribute('rotation'));
-                
+ 
             }
             
-            function moveCamera(){
-                
-            }
+            // Main update loop
             
             // Calculate the forces acting on the nodes
             function calcForce(){
@@ -527,7 +467,7 @@
 
                     distanceVec.normalize();
                     
-                    var springForce = distanceVec.multiplyScalar(springConstant *5 * (distanceMag - 1));
+                    var springForce = distanceVec.multiplyScalar(springConstant * 3 * (distanceMag - 1));
 
                     forceOnNode[sourceNode].addVectors(forceOnNode[sourceNode], springForce);
                     
@@ -535,85 +475,10 @@
                     
                     forceOnNode[targetNode].addVectors(forceOnNode[targetNode], springForce);
                     
-                    /*
-                    for(var j = 0; j < allEdges.length; j++){
-                    
-                        if(i != j){
-                            
-                            var sourceNode2 = allEdges[j].getAttribute('source');
-                            var targetNode2 = allEdges[j].getAttribute('target');
-
-
-                            var addVectors2 = new THREE.Vector3(0,0,0);
-
-                            addVectors2.addVectors(nodePositions[targetNode2], nodePositions[sourceNode2]);
-
-                            addVectors2.divideScalar(2);
-
-                            //var edgeWeight = allEdges[j].getAttribute('weight');
-
-                            var distanceMag2 = nodePositions[sourceNode2].distanceTo(nodePositions[targetNode2]);
-
-                            //distanceMag -= springEquilibrium;
-
-                            var distanceVec = new THREE.Vector3(0, 0, 0);
-
-                            distanceVec.subVectors(addVectors2, addVectors);
-
-                            distanceVec.normalize();
-                            
-                            var magneticForce = distanceVec.multiplyScalar(-coulombConstant * ((nodeCharge * nodeCharge) / (distanceMag2 * distanceMag2)));
-
-                            forceOnNode[i].addVectors(forceOnNode[i], magneticForce);  
-
-                            forceOnNode[sourceNode].addVectors(forceOnNode[sourceNode], magneticForce);
-                            forceOnNode[targetNode].addVectors(forceOnNode[targetNode], magneticForce);
-                            magneticForce.multiplyScalar(-1);
-
-                            forceOnNode[sourceNode2].addVectors(forceOnNode[sourceNode2], magneticForce);
-                            forceOnNode[targetNode2].addVectors(forceOnNode[targetNode2], magneticForce);
-
-                            
-                        }
-                    
-                      
-
-
-                    }
-                    */
+                   
                 }
                 
-                /*
-                for(var i = 0; i < allNodes.length; i++){
-                    
-                    
-                     var distanceMag = nodePositions[i].distanceTo(nodePositions[i]);
- 
-                    // Calculate magnetic force for all nodes (repulsive)
-                            
-                    if(distanceMag < 25){
-                        var distanceVec = new THREE.Vector3(0, 0, 0);
 
-                        distanceVec.subVectors(nodePositions[mostConnected], nodePositions[i]);
-
-                        distanceVec.normalize();
-
-                        var magneticForce = distanceVec.multiplyScalar(-coulombConstant * ((nodeCharge * nodeCharge) / (distanceMag * distanceMag)));
-
-                        forceOnNode[i].addVectors(forceOnNode[i], magneticForce);  
-                   }
-                          
-                            
-                            
-                          
-                        
-                        
-                    
-                    
-                }
-                
-               
-                */ 
                 for(var i = 0; i < allNodes.length; i++){
                     
  
@@ -726,7 +591,7 @@
                 percentForce = ((maxForce - average) / maxForce) * 100;
                 
                 
-                if(percentForce > 99.8){
+                if(percentForce > 99.9){
                     calculating = false;
                     
                 }
@@ -756,7 +621,7 @@
                 
                 stepTime += elapsed;
                 
-                if(steps % 10 == 0){
+                if(steps % 4 == 0){
                     updatePosition();
                     geometry.computeBoundingSphere();
                     nodeGeometry.computeBoundingSphere();
@@ -777,7 +642,7 @@
                 
                 for(var i = 0; i < allNodes.length; i++){
                     //if(i != mostConnected){
-                        allNodes[i].setAttribute('position', '' + nodePositions[i].x + ' ' + nodePositions[i].y + ' ' + nodePositions[i].z);
+                        //allNodes[i].setAttribute('position', '' + nodePositions[i].x + ' ' + nodePositions[i].y + ' ' + nodePositions[i].z);
                     //}
                     
                     positions[i * 3] = nodePositions[i].x;
@@ -867,7 +732,6 @@
                     
                     // Store xml response in variable
                     var xml = xhr.responseXML;
-                    console.dir(xhr);
                     
                     // get nodes and edges from xml
                     var nodes = xml.querySelectorAll('node');
@@ -891,7 +755,6 @@
                     
                     colors = new Float32Array( edges.length * 6 );
                     nodeColors = new Float32Array( nodes.length * 3 );
-                    var nodeScale = new Float32Array( nodes.length);
                     lineVertices = new Float32Array(edges.length * 6 );
                     
                     
@@ -917,31 +780,14 @@
                         neighborList[Math.floor(edgeTarget)].push(Math.floor(edgeSource));
                         
                         // THREE BUFFER LINE
-                        
-                        /*
-                        //r = 800;
-                        for ( var i = 0; i < segments; i ++ ) {
-                            var x = Math.random() * r - r / 2;
-                            var y = Math.random() * r - r / 2;
-                            var z = Math.random() * r - r / 2;
-                            // positions
-                            positions[ i * 3 ] = x;
-                            positions[ i * 3 + 1 ] = y;
-                            positions[ i * 3 + 2 ] = z;
-                            // colors
-                            colors[ i * 3 ] = ( x / r ) + 0.5;
-                            colors[ i * 3 + 1 ] = ( y / r ) + 0.5;
-                            colors[ i * 3 + 2 ] = ( z / r ) + 0.5;
-                        }
-                        */
-                        
+
                         //positions[i] = 0;
-                        colors[i] = '0';
-                        colors[i * 6 + 1] = '0';
+                        colors[i] = '8';
+                        colors[i * 6 + 1] = '8';
                         colors[i * 6 + 2] = '8';
-                        colors[i * 6 + 3] = '0';
-                        colors[i * 6 + 4] = '0';
-                        colors[i * 6 + 5] = '0';
+                        colors[i * 6 + 3] = '8';
+                        colors[i * 6 + 4] = '8';
+                        colors[i * 6 + 5] = '8';
                         
                         
                         lineVertices[i * 6] = 1;
@@ -951,19 +797,7 @@
                         lineVertices[i * 6 + 4] = 2;
                         lineVertices[i * 6 + 5] = 2;
                         
-                        /*
-                        lineVertices[i * 2] = new THREE.Vector3( 0,  10, 0 );
-                        lineVertices[i * 2 + 1] = new THREE.Vector3( 0,  0, 0 );
-                        
-                        
-                        geometry.vertices.push(
-                            new THREE.Vector3( 0,  10, 0 ),
-	                        new THREE.Vector3( 0, 0, 0 )
-                        )
-                        */
-                        //lineGeometry.addAttribute('position', new THREE.BufferAttribute(vertices, 3));
-                        
-                        
+
                         var edgeLine = document.createElement('a-entity');
                         
                         edgeLine.setAttribute('source', Math.floor(edgeSource));
@@ -1005,29 +839,20 @@
                     geometry.addAttribute( 'color', new THREE.BufferAttribute( colors, 3 ) );
                     
                     geometry.computeBoundingSphere();
+                    
+                    material.transparent = true;
+                    material.opacity = 0.5;
+                    
                     mesh = new THREE.LineSegments( geometry, material );
                     
                     camera3.add( mesh );
                     
                     console.dir(edges.length);
-                    
-                    
-                    
-                    nodeGeometry = new THREE.InstancedBufferGeometry();
-                    nodeGeometry.copy( new THREE.CircleBufferGeometry( 1, 12 ) );
 
-                    //var particleCount = 75000;
+                    var sizes = new Float32Array( nodes.length );
 
-                    var translateArray = new Float32Array( nodes.length * 3 );
+                    nodeGeometry = new THREE.BufferGeometry();
 
-                    //for ( var i = 0, i3 = 0, l = particleCount; i < l; i ++, i3 += 3 ) {
-
-
-
-                    //}
-
-                    
-                    
                     
                     positions = new Float32Array( nodes.length * 3 );
                     
@@ -1039,110 +864,27 @@
                         var nodeID = node.getAttribute('id');
                         // get the current node's label
                         var nodeLabel = node.getAttribute('label');
-                        
-                        
-                        
 
-                        
-
-                        //var positions = new Float32Array( nodes.length * 3 );
-                            
-                        /*
-                        for ( var i = 0, i3 = 0, l = particleCount; i < l; i ++, i3 += 3 ) {
-
-                            translateArray[ i3 + 0 ] = Math.random() * 2 - 1;
-                            translateArray[ i3 + 1 ] = Math.random() * 2 - 1;
-                            translateArray[ i3 + 2 ] = Math.random() * 2 - 1;
-
-                        }
-                        */
-                        
-                        /*
-                        material = new THREE.RawShaderMaterial( {
-                            uniforms: {
-                                map: { value: new THREE.TextureLoader().load( "circle.png" ) },
-                                time: { value: 0.0 }
-                            },
-                            vertexShader: document.getElementById( 'vshader' ).textContent,
-                            fragmentShader: document.getElementById( 'fshader' ).textContent,
-                            depthTest: true,
-                            depthWrite: true
-                        } );
-                            */
-                        
-                        
-                        
-                        /*
-                        // get the current node's x position
-                        var nodePositionX = node.querySelector('position').getAttribute('x');
-                        if(!nodePositionX){
-                            nodePositionX = nodeID;
-                        }
-                        // get the current node's y position
-                        var nodePositionY = node.querySelector('position').getAttribute('y');
-                         if(!nodePositionY){
-                            nodePositionY = nodeID;
-                        }
-                        
-                        var xyDistance = Math.sqrt((nodePositionX * nodePositionX) + (nodePositionY * nodePositionY));
-                        xyDistance /= 550;
-                        var randMultiplyer = Math.floor((Math.random() * 100)) % 2;                       
-                        if(randMultiplyer == 0){
-                            randMultiplyer = -1;
-                        }
-                        else {
-                            randMultiplyer = 1;
-                        }
-                        var randomZ = (Math.random() * randMultiplyer * xyDistance) -5;
-                        */
-                        // Set a random Z coordinate for the node (within a range of values)
                         
                         // Save the node's position
                         //nodePositions[i] = new THREE.Vector3((nodePositionX / 100), (nodePositionY / 100), randomZ);
                         nodePositions[i] = new THREE.Vector3(Math.random(), Math.random(), Math.random());
                         startPositions[i] = new THREE.Vector3(nodePositions[i].x, nodePositions.y, nodePositions.z);
-                        
-                        nodeColors[i] = '8';
-                        nodeColors[i * 3 + 1] = '0';
-                        nodeColors[i * 3 + 2] = '0';
-                        
+
                         positions[ i * 3 + 0 ] = Math.random() * 2 - 1;
                         positions[ i * 3 + 1 ] = Math.random() * 2 - 1;
                         positions[ i * 3 + 2 ] = Math.random() * 2 - 1;
                         
-                        nodeScale[i] = neighborList[i];
-                        /*
-                        var geometry1 = new THREE.SphereBufferGeometry( 5, 32, 32 );
-                        var material1 = new THREE.MeshBasicMaterial( {color: 0xffff00} );
-                        var sphere1 = new THREE.Mesh( geometry1, material1 );
-                        scene.add( sphere1 );
-                        */
-                        /*
-                        // get the current node's size
-                        var nodeSize = node.querySelector('size').getAttribute('value');
+                        sizes[i] = neighborList[i].length + 5;
                         
+                        var color = new THREE.Color();
                        
-
-                        if(!nodeSize){
-                            nodeSize = 0.1;
-                        }
                         
-                        // get the current node's r color value
-                        var nodeColorR = node.querySelector('color').getAttribute('r');
-                         if(!nodeColorR){
-                             nodeColorR = 0;
-                         }
-                         // get the current node's g color value
-                        var nodeColorG = node.querySelector('color').getAttribute('g');
-                         if(!nodeColorG){
-                             nodeColorG = 0;
-                         }
-                         // get the current node's b color value
-                        var nodeColorB = node.querySelector('color').getAttribute('b');
-                         if(!nodeColorB){
-                             nodeColorB = 0;
-                         }
-                        */
+
+                        color.setRGB( neighborList[i].length * 0.075, 0, 0 );
+
+                        color.toArray( nodeColors, i * 3 );
+
                         // create sphere for node
                         var nodeSphere = document.createElement('a-entity');
                         nodeSphere.setAttribute('geometry', {
@@ -1154,10 +896,6 @@
                             //depth: ((Math.log(neighborList[i].length) + 1) / 5)
                             buffer: true
                         });
-                       
-                        //nodeSphere.getAttribute('geometry').addAttribute('position', new THREE.BufferAttribute(, 3);
-                        //nodeSphere.setAttribute('height', nodeSize / 80);
-                        //nodeSphere.setAttribute('width', nodeSize / 80);
                         
                         nodeSphere.setAttribute('position', {
                             x: startPositions[i].z,
@@ -1184,55 +922,30 @@
                         //document.querySelector('#structure').appendChild(nodeSphere);
 
                     }
-                    
-                    /*
-                    geometry.addAttribute( "position", new THREE.InstancedBufferAttribute( positions, 3, 1 ).setDynamic( true )  );
-                    geometry.addAttribute( 'color', new THREE.BufferAttribute( colors, 3 ) );
-                    nodeMesh = new THREE.Mesh( geometry, material );
-                    //nodeMesh.scale.set( 500, 500, 500 );
-                    scene.add( nodeMesh );
-                    */
-                    
-                    nodeGeometry.addAttribute( "translate", new THREE.InstancedBufferAttribute( positions, 3, 1 ).setDynamic( true )  );
-                    nodeGeometry.addAttribute( "scale", new THREE.BufferAttribute( nodeScale, 1 ) );
 
-                    material = new THREE.RawShaderMaterial( {
+                    
+                    nodeGeometry.addAttribute( 'position', new THREE.BufferAttribute( positions, 3 ).setDynamic( true ) );
+                    nodeGeometry.addAttribute( 'ca', new THREE.BufferAttribute( nodeColors, 3 ) );
+                    nodeGeometry.addAttribute( 'size', new THREE.BufferAttribute( sizes, 1 ) );
+                    
+                    var texture = new THREE.TextureLoader().load( "media/ball.png" );
+                    texture.wrapS = THREE.RepeatWrapping;
+                    texture.wrapT = THREE.RepeatWrapping;
+                    material = new THREE.ShaderMaterial( {
                         uniforms: {
-                            map: { value: new THREE.TextureLoader().load( "media/ball.png" ) },
-                            time: { value: 0.0 }
+                            amplitude: { value: 1.0 },
+                            color:     { value: new THREE.Color( 0xffffff ) },
+                            texture:   { value: texture }
                         },
-                        vertexShader: document.getElementById( 'vshader' ).textContent,
-                        fragmentShader: document.getElementById( 'fshader' ).textContent,
-                        depthTest: true,
-                        depthWrite: true
-                    } );
-                    
-                    material = new THREE.
-                    
+                        vertexShader:   document.getElementById( 'vertexshader' ).textContent,
+                        fragmentShader: document.getElementById( 'fragmentshader' ).textContent
+                    });
+                    //
                     nodeGeometry.computeBoundingSphere();
-                    nodeMesh = new THREE.Mesh( nodeGeometry, material );
-                    //nodeMesh.scale.set( 2, 2, 2 );
-                    
-                    camera3.add( nodeMesh );
-                    scene.add(camera3);
-                    
-                    
-                    /*
-                    nodeGeometry = new THREE.BufferGeometry();
-            
-                    nodeGeometry.addAttribute( 'position', new THREE.BufferAttribute( positions, 3 ));
-                    nodeGeometry.addAttribute( 'color', new THREE.BufferAttribute( nodeColors, 3 ) );
-                    material = new THREE.PointsMaterial( { size: 1 } );
-                    nodeGeometry.computeBoundingSphere();
-                    nodeMesh = new THREE.Points( geometry, material );
-                    
-                    //nodeMesh.geometry.setAttribute('class', 'collidable')
-                    
+                    nodeMesh = new THREE.Points( nodeGeometry, material );
                     camera3.add(nodeMesh);
-                    scene.add(camera3);
-                    */
-                    //nodeMesh.scale.set( 500, 500, 500 );
-                    
+                    scene.add( camera3 );
+
                     
                     for(var i = 0; i < allNodes.length; i++){
                         forceOnNode[i] = new THREE.Vector3(0, 0, 0);
@@ -1289,14 +1002,14 @@
             
             <a-entity id="cursor" cursor="fuse: true"
               raycaster="far: 100; interval: 1000"
-              scale='0.05 0.05 0.05'
+              scale='0.02 0.02 0.02'
               position='0 0 -1.5'
               geometry="primitive: ring"
               class='ignore-ray'
               material="color: white">
               
               <a-animation begin="click" easing="ease-in" attribute="scale"
-                     fill="backwards" from="0.01 0.01 0.01" to="0.05 0.05 0.05" dur="500"></a-animation>
+                     fill="backwards" from="0.05 0.05 0.05" to="0.02 0.02 0.02" dur="500"></a-animation>
               
             
             <a-animation begin="cursor-fusing" easing="ease-in" attribute="material.color"
@@ -1314,7 +1027,7 @@
             
 
       <a-plane color="tan" height="200" width="200" position="0 -100 0" rotation="-90 0 0"></a-plane>
-      <a-box color="black" height="250" width="200" depth="200" scale="-1 1 1"></a-box>
+      <a-box color="gray" height="250" width="200" depth="200" scale="-1 1 1"></a-box>
     </a-scene>
     
 </body>
