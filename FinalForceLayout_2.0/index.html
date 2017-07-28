@@ -226,13 +226,9 @@
                 
                 if (myKeys.keydown[myKeys.KEYBOARD.KEY_r] && myKeys.keydown[myKeys.KEYBOARD.KEY_SHIFT]){
                     rotateSpeed -= 0.05;
-                    //rotateStructure += rotateSpeed;
-                    //document.querySelector("#structure").setAttribute('rotation', '0 ' + rotateStructure + ' 0');
                 }
                 else if(myKeys.keydown[myKeys.KEYBOARD.KEY_r]){
                     rotateSpeed += 0.05;
-                    //rotateStructure += rotateSpeed;
-                    //document.querySelector("#structure").setAttribute('rotation', '0 ' + rotateStructure + ' 0');
                 }
                 
                 if(myKeys.keydown[myKeys.KEYBOARD.KEY_c]){
@@ -249,6 +245,7 @@
                 user.setAttribute('position', '' + userPosition.x + ' ' + userPosition.y + ' ' + userPosition.z + '');
                 cameraSpeed.multiplyScalar(0.97);
                 
+                // Update Structure Rotation
                 if(rotateSpeed > 1){
                     rotateSpeed = 1;
                 }
